@@ -1,0 +1,77 @@
+# =============================
+# Dependencies
+# =============================
+node_modules/
+
+# =============================
+# Environment variables
+# (keep .env.example as the tracked template)
+# =============================
+.env
+.env.*
+!.env.example
+
+# =============================
+# Backend (Express + Prisma)
+# =============================
+backend/generated/
+backend/skills-lock.json
+backend/src/generated/
+
+# =============================
+# Frontend (Next.js)
+# =============================
+frontend/.next/
+frontend/out/
+frontend/build
+frontend/.vercel
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+!frontend/.yarn/patches
+!frontend/.yarn/plugins
+!frontend/.yarn/releases
+!frontend/.yarn/versions
+frontend/coverage
+
+# =============================
+# TypeScript
+# =============================
+*.tsbuildinfo
+next-env.d.ts
+
+# =============================
+# AI agent tools
+# =============================
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# =============================
+# Documentation artifacts
+# =============================
+docs/workpulse_erd.png
+
+# =============================
+# IDE / Editor
+# =============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.pem
+
+# =============================
+# OS
+# =============================
+.DS_Store
+Thumbs.db
+
+# =============================
+# Debug logs
+# =============================
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
