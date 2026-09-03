@@ -1,58 +1,84 @@
 import bcrypt from "bcryptjs";
 
-import { prisma } from "./config/database.js";
+import { pool, query } from "./config/database.js";
 import { SEED_PERMISSIONS, SEED_ROLES } from "./constants/permissions.js";
 
 async function seed() {
   console.log("Seeding permissions...");
   const permissionIds: Record<string, string> = {};
   for (const perm of SEED_PERMISSIONS) {
-    const created = await prisma.permission.upsert({
-      where: { key: perm.key },
-      update: { name: perm.name, module: perm.module, description: perm.description },
-      create: {
-        key: perm.key,
-        name: perm.name,
-        module: perm.module,
-        description: perm.description,
-      },
-    });
-    permissionIds[perm.key] = created.id;
+    const existing = (await query(
+      `SELECT id FROM Permission WHERE key = ? LIMIT 1`,
+      [perm.key]
+    )) as { id: string }[];
+
+    if (existing[0]) {
+      await query(
+        `UPDATE Permission SET name = ?, module = ?, description = ?, updatedAt = NOW() WHERE id = ?`,
+        [perm.name, perm.module, perm.description, existing[0].id]
+      );
+      permissionIds[perm.key] = existing[0].id;
+    } else {
+      const id = crypto.randomUUID();
+      await query(
+        `INSERT INTO Permission (id, name, key, description, module) VALUES (?, ?, ?, ?, ?)`,
+        [id, perm.name, perm.key, perm.description, perm.module]
+      );
+      permissionIds[perm.key] = id;
+    }
   }
 
   console.log("Seeding roles...");
   for (const role of SEED_ROLES) {
-    await prisma.role.upsert({
-      where: { key: role.key },
-      update: { name: role.name, description: role.description, isSystem: true },
-      create: {
-        key: role.key,
-        name: role.name,
-        description: role.description,
-        isSystem: true,
-        permissions: {
-          create: role.permissionKeys.map((key) => ({ permissionId: permissionIds[key]! })),
-        },
-      },
-    });
+    const existing = (await query(
+      `SELECT id FROM Role WHERE key = ? LIMIT 1`,
+      [role.key]
+    )) as { id: string }[];
+
+    if (existing[0]) {
+      await query(
+        `UPDATE Role SET name = ?, description = ?, isSystem = ?, updatedAt = NOW() WHERE id = ?`,
+        [role.name, role.description, 1, existing[0].id]
+      );
+    } else {
+      const id = crypto.randomUUID();
+      await query(
+        `INSERT INTO Role (id, name, key, description, isSystem) VALUES (?, ?, ?, ?, ?)`,
+        [id, role.name, role.key, role.description, 1]
+      );
+      for (const key of role.permissionKeys) {
+        await query(
+          `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
+          [id, permissionIds[key]!]
+        );
+      }
+    }
   }
 
   console.log("Syncing role permissions...");
   for (const role of SEED_ROLES) {
-    const existing = await prisma.role.findUnique({
-      where: { key: role.key },
-      include: { permissions: { select: { permissionId: true } } },
-    });
-    if (existing && existing.permissions.length !== role.permissionKeys.length) {
-      await prisma.role.update({
-        where: { id: existing.id },
-        data: {
-          permissions: {
-            deleteMany: {},
-            create: role.permissionKeys.map((key) => ({ permissionId: permissionIds[key]! })),
-          },
-        },
-      });
+    const roleRows = (await query(
+      `SELECT id FROM Role WHERE key = ? LIMIT 1`,
+      [role.key]
+    )) as { id: string }[];
+    const roleId = roleRows[0]?.id;
+    if (!roleId) {
+      continue;
+    }
+    const countRows = (await query(
+      `SELECT COUNT(*) AS count FROM RolePermission WHERE roleId = ?`,
+      [roleId]
+    )) as { count: number }[];
+    const permissionCount = Number(countRows[0]?.count ?? 0);
+
+    if (permissionCount !== role.permissionKeys.length) {
+      await query(`DELETE FROM RolePermission WHERE roleId = ?`, [roleId]);
+      for (const key of role.permissionKeys) {
+        await query(
+          `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
+          [roleId, permissionIds[key]!]
+        );
+      }
     }
   }
 
@@ -61,35 +87,34 @@ async function seed() {
   const adminUsername = process.env.SEED_ADMIN_USERNAME ?? "admin";
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
 
-  const adminRole = await prisma.role.findUnique({ where: { key: "admin" } });
-  const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
+  const adminRoleRows = (await query(
+    `SELECT id FROM Role WHERE key = 'admin' LIMIT 1`
+  )) as { id: string }[];
+  const adminRoleId = adminRoleRows[0]?.id;
 
-  if (existingAdmin) {
-    if (adminRole) {
-      await prisma.user.update({
-        where: { id: existingAdmin.id },
-        data: {
-          roles: {
-            deleteMany: {},
-            create: [{ roleId: adminRole.id }],
-          },
-        },
-      });
+  const existingAdminRows = (await query(
+    `SELECT id FROM User WHERE email = ? LIMIT 1`,
+    [adminEmail]
+  )) as { id: string }[];
+
+  if (existingAdminRows[0]) {
+    if (adminRoleId) {
+      await query(`DELETE FROM UserRole WHERE userId = ?`, [existingAdminRows[0].id]);
+      await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [
+        existingAdminRows[0].id,
+        adminRoleId,
+      ]);
     }
     console.log("Admin user already exists.");
-  } else if (adminRole) {
+  } else if (adminRoleId) {
     const hashed = await bcrypt.hash(adminPassword, 10);
-    await prisma.user.create({
-      data: {
-        name: "Admin",
-        email: adminEmail,
-        username: adminUsername,
-        password: hashed,
-        position: "Administrator",
-        isActive: true,
-        roles: { create: [{ roleId: adminRole.id }] },
-      },
-    });
+    const id = crypto.randomUUID();
+    await query(
+      `INSERT INTO User (id, name, email, username, password, position, isActive)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, "Admin", adminEmail, adminUsername, hashed, "Administrator", 1]
+    );
+    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, adminRoleId]);
     console.log("Admin user created.");
   }
 
@@ -101,4 +126,4 @@ seed()
     console.error(e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(() => query(`SELECT 1`).then(() => pool.end()));

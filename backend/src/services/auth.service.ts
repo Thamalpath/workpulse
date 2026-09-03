@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-import { prisma } from "../config/database.js";
+import { query } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 
 const DEFAULT_ROLE_KEYS = ["team-member"];
@@ -22,14 +22,8 @@ export type AuthRole = {
   permissions: string[];
 };
 
-type UserWithRoles = {
-  id: string;
-  email: string;
-  username: string;
-  name: string;
-  position: string | null;
-  avatarUrl: string | null;
-  isActive: boolean;
+type UserWithRoles = AuthUser & {
+  password: string;
   roles: {
     role: {
       id: string;
@@ -40,56 +34,83 @@ type UserWithRoles = {
   }[];
 };
 
-const includeRoles = {
-  roles: {
-    include: {
+type UserRow = {
+  id: string;
+  email: string;
+  username: string;
+  password: string;
+  name: string;
+  position: string | null;
+  avatarUrl: string | null;
+  isActive: boolean;
+};
+
+async function fetchUserWithRoles(userId: string): Promise<{ roles: UserWithRoles["roles"] }> {
+  const roleRows = (await query(
+    `SELECT r.id, r.key, r.name
+     FROM Role r
+     JOIN UserRole ur ON ur.roleId = r.id
+     WHERE ur.userId = ?
+     ORDER BY r.createdAt ASC`,
+    [userId]
+  )) as { id: string; key: string; name: string }[];
+
+  const roles: UserWithRoles["roles"] = [];
+  for (const role of roleRows) {
+    const permissionRows = (await query(
+      `SELECT p.key
+       FROM Permission p
+       JOIN RolePermission rp ON rp.permissionId = p.id
+       WHERE rp.roleId = ?`,
+      [role.id]
+    )) as { key: string }[];
+    roles.push({
       role: {
-        include: {
-          permissions: {
-            include: { permission: true },
-          },
-        },
+        id: role.id,
+        key: role.key,
+        name: role.name,
+        permissions: permissionRows.map((p) => ({ permission: { key: p.key } })),
       },
-    },
-  },
-} as const;
+    });
+  }
+  return { roles };
+}
 
-function sanitizeUser(user: UserWithRoles): { user: AuthUser; roles: AuthRole[] } {
-  const roles: AuthRole[] = user.roles.map(({ role }) => ({
-    id: role.id,
-    key: role.key,
-    name: role.name,
-    permissions: role.permissions.map((p) => p.permission.key),
-  }));
-
+function toUserShape(row: UserRow, roles: UserWithRoles["roles"]): UserWithRoles {
   return {
-    user: {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      name: user.name,
-      position: user.position,
-      avatarUrl: user.avatarUrl,
-      isActive: user.isActive,
-    },
+    id: row.id,
+    email: row.email,
+    username: row.username,
+    password: row.password,
+    name: row.name,
+    position: row.position,
+    avatarUrl: row.avatarUrl,
+    isActive: row.isActive,
     roles,
   };
 }
 
 export async function findByEmailOrUsername(identifier: string) {
-  return prisma.user.findFirst({
-    where: {
-      OR: [{ email: identifier }, { username: identifier }],
-    },
-    include: includeRoles,
-  });
+  const rows = (await query(
+    `SELECT * FROM User WHERE email = ? OR username = ? LIMIT 1`,
+    [identifier, identifier]
+  )) as UserRow[];
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  const { roles } = await fetchUserWithRoles(row.id);
+  return toUserShape(row, roles);
 }
 
 export async function findById(id: string) {
-  return prisma.user.findUnique({
-    where: { id },
-    include: includeRoles,
-  });
+  const rows = (await query(`SELECT * FROM User WHERE id = ? LIMIT 1`, [id])) as UserRow[];
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  const { roles } = await fetchUserWithRoles(row.id);
+  return toUserShape(row, roles);
 }
 
 export async function registerUser(data: {
@@ -100,42 +121,66 @@ export async function registerUser(data: {
   position?: string;
   roleKeys?: string[];
 }) {
-  const existing = await prisma.user.findFirst({
-    where: {
-      OR: [{ email: data.email.toLowerCase() }, { username: data.username.toLowerCase() }],
-    },
-  });
+  const email = data.email.toLowerCase();
+  const username = data.username.toLowerCase();
 
-  if (existing) {
+  const existingRows = (await query(
+    `SELECT id FROM User WHERE email = ? OR username = ? LIMIT 1`,
+    [email, username]
+  )) as { id: string }[];
+  if (existingRows.length > 0) {
     throw new ApiError(409, "A user with this email or username already exists.");
   }
 
   const roleKeys = data.roleKeys && data.roleKeys.length > 0 ? data.roleKeys : DEFAULT_ROLE_KEYS;
-  const roles = await prisma.role.findMany({
-    where: { key: { in: roleKeys } },
-    select: { id: true },
-  });
+  const placeholders = roleKeys.map(() => "?").join(",");
+  const roleRows = (await query(
+    `SELECT id, key, name FROM Role WHERE key IN (${placeholders})`,
+    roleKeys
+  )) as { id: string; key: string; name: string }[];
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
+  const id = crypto.randomUUID();
 
-  const createData: Record<string, unknown> = {
-    name: data.name,
-    email: data.email.toLowerCase(),
-    username: data.username.toLowerCase(),
-    password: hashedPassword,
-    position: data.position ?? null,
-    roles:
-      roles.length > 0
-        ? { create: roles.map((r) => ({ roleId: r.id })) }
-        : undefined,
+  await query(
+    `INSERT INTO User (id, email, username, password, name, position, isActive)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, email, username, hashedPassword, data.name, data.position ?? null, true]
+  );
+
+  for (const role of roleRows) {
+    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, role.id]);
+  }
+
+  const roles: AuthRole[] = [];
+  for (const role of roleRows) {
+    const permissionRows = (await query(
+      `SELECT p.key
+       FROM Permission p
+       JOIN RolePermission rp ON rp.permissionId = p.id
+       WHERE rp.roleId = ?`,
+      [role.id]
+    )) as { key: string }[];
+    roles.push({
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      permissions: permissionRows.map((p) => p.key),
+    });
+  }
+
+  return {
+    user: {
+      id,
+      email,
+      username,
+      name: data.name,
+      position: data.position ?? null,
+      avatarUrl: null,
+      isActive: true,
+    },
+    roles,
   };
-
-  const user = await prisma.user.create({
-    data: createData as never,
-    include: includeRoles,
-  });
-
-  return sanitizeUser(user as UserWithRoles);
 }
 
 export async function verifyPassword(password: string, hashed: string) {
@@ -143,18 +188,20 @@ export async function verifyPassword(password: string, hashed: string) {
 }
 
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { password: true } });
-  if (!user) {
+  const rows = (await query(`SELECT password FROM User WHERE id = ? LIMIT 1`, [userId])) as {
+    password: string;
+  }[];
+  if (!rows[0]) {
     throw new ApiError(404, "User not found.");
   }
 
-  const valid = await bcrypt.compare(currentPassword, user.password);
+  const valid = await bcrypt.compare(currentPassword, rows[0].password);
   if (!valid) {
     throw new ApiError(401, "Current password is incorrect.");
   }
 
   const hashed = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+  await query(`UPDATE User SET password = ?, updatedAt = NOW() WHERE id = ?`, [hashed, userId]);
 }
 
 export async function buildMePayload(userId: string) {
@@ -162,5 +209,21 @@ export async function buildMePayload(userId: string) {
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
-  return sanitizeUser(user as UserWithRoles);
+  return {
+    user: {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      name: user.name,
+      position: user.position,
+      avatarUrl: user.avatarUrl,
+      isActive: user.isActive,
+    },
+    roles: user.roles.map(({ role }) => ({
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      permissions: role.permissions.map((p) => p.permission.key),
+    })),
+  };
 }

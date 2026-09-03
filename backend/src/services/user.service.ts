@@ -1,24 +1,7 @@
-import { prisma } from "../config/database.js";
+import { query } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 
-const userInclude = {
-  roles: {
-    include: {
-      role: { include: { permissions: { include: { permission: true } } } },
-    },
-  },
-} as const;
-
-type RoleShape = {
-  role: {
-    id: string;
-    key: string;
-    name: string;
-    permissions: { permission: { key: string } }[];
-  };
-};
-
-function mapUser(u: {
+type UserRow = {
   id: string;
   email: string;
   username: string;
@@ -27,40 +10,96 @@ function mapUser(u: {
   avatarUrl: string | null;
   isActive: boolean;
   createdAt: Date;
-  roles: RoleShape[];
-}) {
+};
+
+type RoleShape = {
+  id: string;
+  key: string;
+  name: string;
+  permissions: string[];
+};
+
+function toBoolean(value: unknown): boolean {
+  return value === true || value === 1 || value === "1";
+}
+
+function mapUser(row: UserRow, roles: RoleShape[]) {
   return {
-    id: u.id,
-    email: u.email,
-    username: u.username,
-    name: u.name,
-    position: u.position,
-    avatarUrl: u.avatarUrl,
-    isActive: u.isActive,
-    createdAt: u.createdAt,
-    roles: u.roles.map(({ role }) => ({
-      id: role.id,
-      key: role.key,
-      name: role.name,
-      permissions: role.permissions.map((p) => p.permission.key),
-    })),
+    id: row.id,
+    email: row.email,
+    username: row.username,
+    name: row.name,
+    position: row.position,
+    avatarUrl: row.avatarUrl,
+    isActive: toBoolean(row.isActive),
+    createdAt: row.createdAt,
+    roles,
   };
 }
 
+async function getRolesForUser(userId: string): Promise<RoleShape[]> {
+  const roleRows = (await query(
+    `SELECT r.id, r.key, r.name
+     FROM Role r
+     JOIN UserRole ur ON ur.roleId = r.id
+     WHERE ur.userId = ?
+     ORDER BY r.createdAt ASC`,
+    [userId]
+  )) as { id: string; key: string; name: string }[];
+
+  const roles: RoleShape[] = [];
+  for (const role of roleRows) {
+    const permissionRows = (await query(
+      `SELECT p.key
+       FROM Permission p
+       JOIN RolePermission rp ON rp.permissionId = p.id
+       WHERE rp.roleId = ?`,
+      [role.id]
+    )) as { key: string }[];
+    roles.push({
+      id: role.id,
+      key: role.key,
+      name: role.name,
+      permissions: permissionRows.map((p) => p.key),
+    });
+  }
+  return roles;
+}
+
+async function fetchUserWithRoles(id: string) {
+  const rows = (await query(
+    `SELECT id, email, username, name, position, avatarUrl, isActive, createdAt
+     FROM User WHERE id = ? LIMIT 1`,
+    [id]
+  )) as UserRow[];
+  const row = rows[0];
+  if (!row) {
+    return null;
+  }
+  const roles = await getRolesForUser(row.id);
+  return mapUser(row, roles);
+}
+
 export async function listUsers() {
-  const users = await prisma.user.findMany({
-    include: userInclude,
-    orderBy: { createdAt: "desc" },
-  });
-  return users.map((u) => mapUser(u as unknown as Parameters<typeof mapUser>[0]));
+  const rows = (await query(
+    `SELECT id, email, username, name, position, avatarUrl, isActive, createdAt
+     FROM User ORDER BY createdAt DESC`
+  )) as UserRow[];
+
+  const result = [];
+  for (const row of rows) {
+    const roles = await getRolesForUser(row.id);
+    result.push(mapUser(row, roles));
+  }
+  return result;
 }
 
 export async function getUserById(id: string) {
-  const user = await prisma.user.findUnique({ where: { id }, include: userInclude });
+  const user = await fetchUserWithRoles(id);
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
-  return mapUser(user as unknown as Parameters<typeof mapUser>[0]);
+  return user;
 }
 
 export async function createUser(data: {
@@ -71,34 +110,45 @@ export async function createUser(data: {
   position?: string;
   roleIds: string[];
 }) {
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: data.email.toLowerCase() }, { username: data.username.toLowerCase() }] },
-  });
-  if (existing) {
+  const email = data.email.toLowerCase();
+  const username = data.username.toLowerCase();
+
+  const existingRows = (await query(
+    `SELECT id FROM User WHERE email = ? OR username = ? LIMIT 1`,
+    [email, username]
+  )) as { id: string }[];
+  if (existingRows.length > 0) {
     throw new ApiError(409, "A user with this email or username already exists.");
   }
 
   const bcrypt = await import("bcryptjs");
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  const createData: Record<string, unknown> = {
-    name: data.name,
-    email: data.email.toLowerCase(),
-    username: data.username.toLowerCase(),
-    password: hashedPassword,
-    position: data.position ?? null,
-    roles:
-      data.roleIds.length > 0
-        ? { create: data.roleIds.map((roleId) => ({ roleId })) }
-        : undefined,
-  };
+  const id = crypto.randomUUID();
+  await query(
+    `INSERT INTO User (id, email, username, password, name, position, isActive)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, email, username, hashedPassword, data.name, data.position ?? null, true]
+  );
 
-  const user = await prisma.user.create({
-    data: createData as never,
-    include: userInclude,
-  });
+  for (const roleId of data.roleIds) {
+    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, roleId]);
+  }
 
-  return mapUser(user as unknown as Parameters<typeof mapUser>[0]);
+  const roles = await getRolesForUser(id);
+  return mapUser(
+    {
+      id,
+      email,
+      username,
+      name: data.name,
+      position: data.position ?? null,
+      avatarUrl: null,
+      isActive: true,
+      createdAt: new Date(),
+    },
+    roles
+  );
 }
 
 export async function updateUser(
@@ -111,39 +161,53 @@ export async function updateUser(
     password?: string;
   }
 ) {
-  const existing = await prisma.user.findUnique({ where: { id } });
-  if (!existing) {
+  const existing = (await query(`SELECT id FROM User WHERE id = ? LIMIT 1`, [id])) as {
+    id: string;
+  }[];
+  if (existing.length === 0) {
     throw new ApiError(404, "User not found.");
   }
 
-  const updateData: Record<string, unknown> = {};
-  if (data.name !== undefined) updateData.name = data.name;
-  if (data.position !== undefined) updateData.position = data.position;
-  if (data.isActive !== undefined) updateData.isActive = data.isActive;
+  if (data.name !== undefined) {
+    await query(`UPDATE User SET name = ?, updatedAt = NOW() WHERE id = ?`, [data.name, id]);
+  }
+  if (data.position !== undefined) {
+    await query(`UPDATE User SET position = ?, updatedAt = NOW() WHERE id = ?`, [
+      data.position,
+      id,
+    ]);
+  }
+  if (data.isActive !== undefined) {
+    await query(`UPDATE User SET isActive = ?, updatedAt = NOW() WHERE id = ?`, [
+      data.isActive ? 1 : 0,
+      id,
+    ]);
+  }
   if (data.password !== undefined && data.password !== "") {
     const bcrypt = await import("bcryptjs");
-    updateData.password = await bcrypt.hash(data.password, 10);
+    const hashed = await bcrypt.hash(data.password, 10);
+    await query(`UPDATE User SET password = ?, updatedAt = NOW() WHERE id = ?`, [hashed, id]);
   }
   if (data.roleIds !== undefined) {
-    updateData.roles = {
-      deleteMany: {},
-      create: data.roleIds.map((roleId) => ({ roleId })),
-    };
+    await query(`DELETE FROM UserRole WHERE userId = ?`, [id]);
+    for (const roleId of data.roleIds) {
+      await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, roleId]);
+    }
   }
 
-  const user = await prisma.user.update({
-    where: { id },
-    data: updateData as never,
-    include: userInclude,
-  });
-
-  return mapUser(user as unknown as Parameters<typeof mapUser>[0]);
+  const user = await fetchUserWithRoles(id);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+  return user;
 }
 
 export async function deleteUser(id: string) {
-  const existing = await prisma.user.findUnique({ where: { id } });
-  if (!existing) {
+  const existing = (await query(`SELECT id FROM User WHERE id = ? LIMIT 1`, [id])) as {
+    id: string;
+  }[];
+  if (existing.length === 0) {
     throw new ApiError(404, "User not found.");
   }
-  await prisma.user.delete({ where: { id } });
+  await query(`DELETE FROM User WHERE id = ?`, [id]);
 }
