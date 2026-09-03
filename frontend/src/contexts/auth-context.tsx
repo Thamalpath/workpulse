@@ -5,9 +5,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { usePathname } from "next/navigation";
 
 import {
   getMe,
@@ -34,10 +36,18 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const sessionChecked = useRef(false);
+
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/" ||
+    pathname === undefined;
 
   useEffect(() => {
     let active = true;
@@ -57,12 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void loadSession();
+    if (!sessionChecked.current && !isAuthPage) {
+      sessionChecked.current = true;
+      void loadSession();
+    } else if (isAuthPage) {
+      setIsLoading(false);
+      sessionChecked.current = true;
+    }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAuthPage]);
 
   function applySession(data: AuthResponse) {
     setUser(data.user);
