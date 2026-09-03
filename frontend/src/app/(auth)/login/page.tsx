@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 import { AuthHero } from "@/components/auth-hero";
@@ -19,10 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (isAuthenticated) {
-    router.replace("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return null;
@@ -38,7 +39,9 @@ export default function LoginPage() {
       router.replace("/dashboard");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to sign in. Please try again."
+        err instanceof Error
+          ? err.message
+          : "Unable to sign in. Please try again.",
       );
       setIsSubmitting(false);
     }
@@ -102,15 +105,6 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-semibold text-[#4263A3] hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
               <Input
                 id="password"
                 type="password"
@@ -142,14 +136,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-
-          <p className="mt-6 rounded-lg border border-[#E1E6ED] bg-[#F5F7FA] px-4 py-3 text-center text-xs text-muted-foreground">
-            Demo credentials:{" "}
-            <span className="font-medium text-[#18202F]">
-              admin@workpulse.com
-            </span>{" "}
-            / <span className="font-medium text-[#18202F]">admin123</span>
-          </p>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

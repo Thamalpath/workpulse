@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 import { AuthHero } from "@/components/auth-hero";
@@ -22,10 +22,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (isAuthenticated) {
-    router.replace("/dashboard");
-    return null;
-  }
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   if (isLoading) {
     return null;
