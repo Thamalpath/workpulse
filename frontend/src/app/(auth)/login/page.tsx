@@ -1,12 +1,49 @@
-﻿import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+﻿"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 import { AuthHero } from "@/components/auth-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login, isAuthenticated, isLoading } = useAuth();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (isAuthenticated) {
+    router.replace("/dashboard");
+    return null;
+  }
+
+  if (isLoading) {
+    return null;
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await login(identifier, password);
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to sign in. Please try again."
+      );
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col lg:grid lg:grid-cols-2">
       <AuthHero />
@@ -35,18 +72,30 @@ export default function LoginPage() {
               Welcome back
             </h2>
             <p className="text-sm text-muted-foreground">
-              Sign in to continue to your workspace.
+              Sign in with your credentials to continue.
             </p>
           </div>
 
-          <form className="space-y-5">
+          {error && (
+            <div
+              role="alert"
+              className="mb-6 flex items-start gap-3 rounded-lg border border-[#C85C5C]/30 bg-[#C85C5C]/10 px-4 py-3 text-sm text-[#C85C5C]"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="email">Email address</Label>
+              <Label htmlFor="email">Username or email</Label>
               <Input
                 id="email"
-                type="email"
-                placeholder="you@company.com"
-                autoComplete="email"
+                type="text"
+                placeholder="admin@workpulse.com"
+                autoComplete="username"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className="h-11"
                 required
               />
@@ -67,6 +116,8 @@ export default function LoginPage() {
                 type="password"
                 placeholder="••••••••"
                 autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="h-11"
                 required
               />
@@ -76,11 +127,29 @@ export default function LoginPage() {
               className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
               size="lg"
               type="submit"
+              disabled={isSubmitting}
             >
-              Sign in
-              <ArrowRight />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight />
+                </>
+              )}
             </Button>
           </form>
+
+          <p className="mt-6 rounded-lg border border-[#E1E6ED] bg-[#F5F7FA] px-4 py-3 text-center text-xs text-muted-foreground">
+            Demo credentials:{" "}
+            <span className="font-medium text-[#18202F]">
+              admin@workpulse.com
+            </span>{" "}
+            / <span className="font-medium text-[#18202F]">admin123</span>
+          </p>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

@@ -1,12 +1,55 @@
-﻿import Link from "next/link";
-import { ArrowRight, Sparkles } from "lucide-react";
+﻿"use client";
+
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
 
 import { AuthHero } from "@/components/auth-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const { register, isAuthenticated, isLoading } = useAuth();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (isAuthenticated) {
+    router.replace("/dashboard");
+    return null;
+  }
+
+  if (isLoading) {
+    return null;
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await register({ name, email, username, password });
+      router.replace("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create your account.");
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen w-full flex-col lg:grid lg:grid-cols-2">
       <AuthHero />
@@ -39,7 +82,17 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          <form className="space-y-5">
+          {error && (
+            <div
+              role="alert"
+              className="mb-6 flex items-start gap-3 rounded-lg border border-[#C85C5C]/30 bg-[#C85C5C]/10 px-4 py-3 text-sm text-[#C85C5C]"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="name">Full name</Label>
               <Input
@@ -47,6 +100,8 @@ export default function RegisterPage() {
                 type="text"
                 placeholder="Jane Cooper"
                 autoComplete="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="h-11"
                 required
               />
@@ -59,6 +114,22 @@ export default function RegisterPage() {
                 type="email"
                 placeholder="you@company.com"
                 autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-11"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="jane.cooper"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="h-11"
                 required
               />
@@ -71,7 +142,10 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="h-11"
+                minLength={6}
                 required
               />
             </div>
@@ -83,6 +157,8 @@ export default function RegisterPage() {
                 type="password"
                 placeholder="••••••••"
                 autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
                 className="h-11"
                 required
               />
@@ -92,9 +168,19 @@ export default function RegisterPage() {
               className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
               size="lg"
               type="submit"
+              disabled={isSubmitting}
             >
-              Create account
-              <ArrowRight />
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                <>
+                  Create account
+                  <ArrowRight />
+                </>
+              )}
             </Button>
           </form>
 
