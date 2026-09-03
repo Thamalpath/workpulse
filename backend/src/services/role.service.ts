@@ -1,8 +1,8 @@
-import { query } from "../config/database.js";
+import { query, withTransaction } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 
 type RoleRow = {
-  id: string;
+  id: string | number;
   key: string;
   name: string;
   description: string | null;
@@ -10,7 +10,7 @@ type RoleRow = {
 };
 
 type PermissionRow = {
-  id: string;
+  id: string | number;
   key: string;
   name: string;
   module: string;
@@ -23,13 +23,13 @@ function toBoolean(value: unknown): boolean {
 
 function mapRole(role: RoleRow, permissions: PermissionRow[], userCount: number) {
   return {
-    id: role.id,
+    id: String(role.id),
     key: role.key,
     name: role.name,
     description: role.description,
     isSystem: toBoolean(role.isSystem),
     permissions: permissions.map((p) => ({
-      id: p.id,
+      id: String(p.id),
       key: p.key,
       name: p.name,
       module: p.module,
@@ -39,9 +39,9 @@ function mapRole(role: RoleRow, permissions: PermissionRow[], userCount: number)
   };
 }
 
-async function getRolePermissions(roleId: string): Promise<PermissionRow[]> {
+async function getRolePermissions(roleId: string | number): Promise<PermissionRow[]> {
   return (await query(
-    `SELECT p.id, p.key, p.name, p.module, p.description
+    `SELECT p.id, p.\`key\`, p.name, p.module, p.description
      FROM Permission p
      JOIN RolePermission rp ON rp.permissionId = p.id
      WHERE rp.roleId = ?
@@ -50,7 +50,7 @@ async function getRolePermissions(roleId: string): Promise<PermissionRow[]> {
   )) as PermissionRow[];
 }
 
-async function getRoleUserCount(roleId: string): Promise<number> {
+async function getRoleUserCount(roleId: string | number): Promise<number> {
   const rows = (await query(
     `SELECT COUNT(*) AS count FROM UserRole WHERE roleId = ?`,
     [roleId]
@@ -60,7 +60,7 @@ async function getRoleUserCount(roleId: string): Promise<number> {
 
 export async function listRoles() {
   const roles = (await query(
-    `SELECT id, key, name, description, isSystem FROM Role ORDER BY createdAt ASC`
+    `SELECT id, \`key\`, name, description, isSystem FROM Role ORDER BY createdAt ASC`
   )) as RoleRow[];
 
   const result = [];
@@ -76,7 +76,7 @@ export async function listRoles() {
 
 export async function getRoleById(id: string) {
   const rows = (await query(
-    `SELECT id, key, name, description, isSystem FROM Role WHERE id = ? LIMIT 1`,
+    `SELECT id, \`key\`, name, description, isSystem FROM Role WHERE id = ? LIMIT 1`,
     [id]
   )) as RoleRow[];
   const role = rows[0];
@@ -97,25 +97,30 @@ export async function createRole(data: {
   permissionIds: string[];
 }) {
   const existing = (await query(
-    `SELECT id FROM Role WHERE key = ? LIMIT 1`,
+    `SELECT id FROM Role WHERE \`key\` = ? LIMIT 1`,
     [data.key]
-  )) as { id: string }[];
+  )) as { id: string | number }[];
   if (existing.length > 0) {
     throw new ApiError(409, "A role with this key already exists.");
   }
 
-  const id = crypto.randomUUID();
-  await query(
-    `INSERT INTO Role (id, name, key, description, isSystem) VALUES (?, ?, ?, ?, ?)`,
-    [id, data.name, data.key, data.description ?? null, false]
-  );
+  const id = String(
+    await withTransaction(async (exec) => {
+      const insertId = await exec.insertId(
+        `INSERT INTO Role (name, \`key\`, description, isSystem) VALUES (?, ?, ?, ?)`,
+        [data.name, data.key, data.description ?? null, false]
+      );
 
-  for (const permissionId of data.permissionIds) {
-    await query(
-      `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
-      [id, permissionId]
-    );
-  }
+      for (const permissionId of data.permissionIds) {
+        await exec.run(
+          `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
+          [insertId, permissionId]
+        );
+      }
+
+      return insertId;
+    })
+  );
 
   const permissions = await getRolePermissions(id);
   return mapRole(
@@ -130,7 +135,7 @@ export async function updateRole(
   data: { name?: string; description?: string; permissionIds?: string[] }
 ) {
   const existing = (await query(
-    `SELECT id, key, name, description, isSystem FROM Role WHERE id = ? LIMIT 1`,
+    `SELECT id, \`key\`, name, description, isSystem FROM Role WHERE id = ? LIMIT 1`,
     [id]
   )) as RoleRow[];
   const role = existing[0];
@@ -147,13 +152,16 @@ export async function updateRole(
   ]);
 
   if (data.permissionIds !== undefined) {
-    await query(`DELETE FROM RolePermission WHERE roleId = ?`, [id]);
-    for (const permissionId of data.permissionIds) {
-      await query(`INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`, [
-        id,
-        permissionId,
-      ]);
-    }
+    const permissionIds = data.permissionIds;
+    await withTransaction(async (exec) => {
+      await exec.run(`DELETE FROM RolePermission WHERE roleId = ?`, [id]);
+      for (const permissionId of permissionIds) {
+        await exec.run(`INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`, [
+          id,
+          permissionId,
+        ]);
+      }
+    });
   }
 
   const permissions = await getRolePermissions(id);
@@ -169,7 +177,7 @@ export async function deleteRole(id: string) {
   const rows = (await query(
     `SELECT id, isSystem FROM Role WHERE id = ? LIMIT 1`,
     [id]
-  )) as { id: string; isSystem: boolean }[];
+  )) as { id: string | number; isSystem: boolean }[];
   const existing = rows[0];
   if (!existing) {
     throw new ApiError(404, "Role not found.");
@@ -186,10 +194,10 @@ export async function deleteRole(id: string) {
 
 export async function listPermissions() {
   const permissions = (await query(
-    `SELECT id, key, name, module, description FROM Permission ORDER BY module ASC, name ASC`
+    `SELECT id, \`key\`, name, module, description FROM Permission ORDER BY module ASC, name ASC`
   )) as PermissionRow[];
   return permissions.map((p) => ({
-    id: p.id,
+    id: String(p.id),
     key: p.key,
     name: p.name,
     module: p.module,

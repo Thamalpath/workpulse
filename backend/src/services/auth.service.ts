@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-import { query } from "../config/database.js";
+import { query, withTransaction } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 
 const DEFAULT_ROLE_KEYS = ["team-member"];
@@ -35,7 +35,7 @@ type UserWithRoles = AuthUser & {
 };
 
 type UserRow = {
-  id: string;
+  id: string | number;
   email: string;
   username: string;
   password: string;
@@ -45,20 +45,20 @@ type UserRow = {
   isActive: boolean;
 };
 
-async function fetchUserWithRoles(userId: string): Promise<{ roles: UserWithRoles["roles"] }> {
+async function fetchUserWithRoles(userId: string | number): Promise<{ roles: UserWithRoles["roles"] }> {
   const roleRows = (await query(
-    `SELECT r.id, r.key, r.name
+    `SELECT r.id, r.\`key\`, r.name
      FROM Role r
      JOIN UserRole ur ON ur.roleId = r.id
      WHERE ur.userId = ?
      ORDER BY r.createdAt ASC`,
     [userId]
-  )) as { id: string; key: string; name: string }[];
+  )) as { id: string | number; key: string; name: string }[];
 
   const roles: UserWithRoles["roles"] = [];
   for (const role of roleRows) {
     const permissionRows = (await query(
-      `SELECT p.key
+      `SELECT p.\`key\`
        FROM Permission p
        JOIN RolePermission rp ON rp.permissionId = p.id
        WHERE rp.roleId = ?`,
@@ -66,7 +66,7 @@ async function fetchUserWithRoles(userId: string): Promise<{ roles: UserWithRole
     )) as { key: string }[];
     roles.push({
       role: {
-        id: role.id,
+        id: String(role.id),
         key: role.key,
         name: role.name,
         permissions: permissionRows.map((p) => ({ permission: { key: p.key } })),
@@ -78,7 +78,7 @@ async function fetchUserWithRoles(userId: string): Promise<{ roles: UserWithRole
 
 function toUserShape(row: UserRow, roles: UserWithRoles["roles"]): UserWithRoles {
   return {
-    id: row.id,
+    id: String(row.id),
     email: row.email,
     username: row.username,
     password: row.password,
@@ -119,7 +119,6 @@ export async function registerUser(data: {
   username: string;
   password: string;
   position?: string;
-  roleKeys?: string[];
 }) {
   const email = data.email.toLowerCase();
   const username = data.username.toLowerCase();
@@ -132,37 +131,42 @@ export async function registerUser(data: {
     throw new ApiError(409, "A user with this email or username already exists.");
   }
 
-  const roleKeys = data.roleKeys && data.roleKeys.length > 0 ? data.roleKeys : DEFAULT_ROLE_KEYS;
+  const roleKeys = DEFAULT_ROLE_KEYS;
   const placeholders = roleKeys.map(() => "?").join(",");
   const roleRows = (await query(
-    `SELECT id, key, name FROM Role WHERE key IN (${placeholders})`,
+    `SELECT id, \`key\`, name FROM Role WHERE \`key\` IN (${placeholders})`,
     roleKeys
-  )) as { id: string; key: string; name: string }[];
+  )) as { id: string | number; key: string; name: string }[];
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
-  const id = crypto.randomUUID();
+  const userId = await withTransaction(async (exec) => {
+    const insertId = await exec.insertId(
+      `INSERT INTO User (email, username, password, name, position, isActive)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [email, username, hashedPassword, data.name, data.position ?? null, true]
+    );
 
-  await query(
-    `INSERT INTO User (id, email, username, password, name, position, isActive)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, email, username, hashedPassword, data.name, data.position ?? null, true]
-  );
+    for (const role of roleRows) {
+      await exec.run(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [
+        insertId,
+        role.id,
+      ]);
+    }
 
-  for (const role of roleRows) {
-    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, role.id]);
-  }
+    return insertId;
+  });
 
   const roles: AuthRole[] = [];
   for (const role of roleRows) {
     const permissionRows = (await query(
-      `SELECT p.key
+      `SELECT p.\`key\`
        FROM Permission p
        JOIN RolePermission rp ON rp.permissionId = p.id
        WHERE rp.roleId = ?`,
       [role.id]
     )) as { key: string }[];
     roles.push({
-      id: role.id,
+      id: String(role.id),
       key: role.key,
       name: role.name,
       permissions: permissionRows.map((p) => p.key),
@@ -171,7 +175,7 @@ export async function registerUser(data: {
 
   return {
     user: {
-      id,
+      id: String(userId),
       email,
       username,
       name: data.name,

@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 
-import { pool, query } from "./config/database.js";
+import { insert, pool, query } from "./config/database.js";
 import { SEED_PERMISSIONS, SEED_ROLES } from "./constants/permissions.js";
 
 async function seed() {
@@ -8,32 +8,31 @@ async function seed() {
   const permissionIds: Record<string, string> = {};
   for (const perm of SEED_PERMISSIONS) {
     const existing = (await query(
-      `SELECT id FROM Permission WHERE key = ? LIMIT 1`,
+      `SELECT id FROM Permission WHERE \`key\` = ? LIMIT 1`,
       [perm.key]
-    )) as { id: string }[];
+    )) as { id: string | number }[];
 
     if (existing[0]) {
       await query(
         `UPDATE Permission SET name = ?, module = ?, description = ?, updatedAt = NOW() WHERE id = ?`,
         [perm.name, perm.module, perm.description, existing[0].id]
       );
-      permissionIds[perm.key] = existing[0].id;
+      permissionIds[perm.key] = String(existing[0].id);
     } else {
-      const id = crypto.randomUUID();
-      await query(
-        `INSERT INTO Permission (id, name, key, description, module) VALUES (?, ?, ?, ?, ?)`,
-        [id, perm.name, perm.key, perm.description, perm.module]
+      const id = await insert(
+        `INSERT INTO Permission (name, \`key\`, description, module) VALUES (?, ?, ?, ?)`,
+        [perm.name, perm.key, perm.description, perm.module]
       );
-      permissionIds[perm.key] = id;
+      permissionIds[perm.key] = String(id);
     }
   }
 
   console.log("Seeding roles...");
   for (const role of SEED_ROLES) {
     const existing = (await query(
-      `SELECT id FROM Role WHERE key = ? LIMIT 1`,
+      `SELECT id FROM Role WHERE \`key\` = ? LIMIT 1`,
       [role.key]
-    )) as { id: string }[];
+    )) as { id: string | number }[];
 
     if (existing[0]) {
       await query(
@@ -41,10 +40,9 @@ async function seed() {
         [role.name, role.description, 1, existing[0].id]
       );
     } else {
-      const id = crypto.randomUUID();
-      await query(
-        `INSERT INTO Role (id, name, key, description, isSystem) VALUES (?, ?, ?, ?, ?)`,
-        [id, role.name, role.key, role.description, 1]
+      const id = await insert(
+        `INSERT INTO Role (name, \`key\`, description, isSystem) VALUES (?, ?, ?, ?)`,
+        [role.name, role.key, role.description, 1]
       );
       for (const key of role.permissionKeys) {
         await query(
@@ -58,9 +56,9 @@ async function seed() {
   console.log("Syncing role permissions...");
   for (const role of SEED_ROLES) {
     const roleRows = (await query(
-      `SELECT id FROM Role WHERE key = ? LIMIT 1`,
+      `SELECT id FROM Role WHERE \`key\` = ? LIMIT 1`,
       [role.key]
-    )) as { id: string }[];
+    )) as { id: string | number }[];
     const roleId = roleRows[0]?.id;
     if (!roleId) {
       continue;
@@ -88,14 +86,14 @@ async function seed() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
 
   const adminRoleRows = (await query(
-    `SELECT id FROM Role WHERE key = 'admin' LIMIT 1`
-  )) as { id: string }[];
+    `SELECT id FROM Role WHERE \`key\` = 'admin' LIMIT 1`
+  )) as { id: string | number }[];
   const adminRoleId = adminRoleRows[0]?.id;
 
   const existingAdminRows = (await query(
     `SELECT id FROM User WHERE email = ? LIMIT 1`,
     [adminEmail]
-  )) as { id: string }[];
+  )) as { id: string | number }[];
 
   if (existingAdminRows[0]) {
     if (adminRoleId) {
@@ -108,11 +106,10 @@ async function seed() {
     console.log("Admin user already exists.");
   } else if (adminRoleId) {
     const hashed = await bcrypt.hash(adminPassword, 10);
-    const id = crypto.randomUUID();
-    await query(
-      `INSERT INTO User (id, name, email, username, password, position, isActive)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, "Admin", adminEmail, adminUsername, hashed, "Administrator", 1]
+    const id = await insert(
+      `INSERT INTO User (name, email, username, password, position, isActive)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      ["Admin", adminEmail, adminUsername, hashed, "Administrator", 1]
     );
     await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, adminRoleId]);
     console.log("Admin user created.");

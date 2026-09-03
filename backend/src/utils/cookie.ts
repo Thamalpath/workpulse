@@ -1,6 +1,6 @@
 import type { Response } from "express";
 
-const COOKIE_NAME = process.env.COOKIE_NAME ?? "workpulse_token";
+const COOKIE_NAME = "workpulse_token";
 const isProd = process.env.NODE_ENV === "production";
 
 export function setAuthCookie(res: Response, token: string) {

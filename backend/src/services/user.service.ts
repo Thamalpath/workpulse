@@ -1,8 +1,8 @@
-import { query } from "../config/database.js";
+import { query, withTransaction } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 
 type UserRow = {
-  id: string;
+  id: string | number;
   email: string;
   username: string;
   name: string;
@@ -25,7 +25,7 @@ function toBoolean(value: unknown): boolean {
 
 function mapUser(row: UserRow, roles: RoleShape[]) {
   return {
-    id: row.id,
+    id: String(row.id),
     email: row.email,
     username: row.username,
     name: row.name,
@@ -37,27 +37,27 @@ function mapUser(row: UserRow, roles: RoleShape[]) {
   };
 }
 
-async function getRolesForUser(userId: string): Promise<RoleShape[]> {
+async function getRolesForUser(userId: string | number): Promise<RoleShape[]> {
   const roleRows = (await query(
-    `SELECT r.id, r.key, r.name
+    `SELECT r.id, r.\`key\`, r.name
      FROM Role r
      JOIN UserRole ur ON ur.roleId = r.id
      WHERE ur.userId = ?
      ORDER BY r.createdAt ASC`,
     [userId]
-  )) as { id: string; key: string; name: string }[];
+  )) as { id: string | number; key: string; name: string }[];
 
   const roles: RoleShape[] = [];
   for (const role of roleRows) {
     const permissionRows = (await query(
-      `SELECT p.key
+      `SELECT p.\`key\`
        FROM Permission p
        JOIN RolePermission rp ON rp.permissionId = p.id
        WHERE rp.roleId = ?`,
       [role.id]
     )) as { key: string }[];
     roles.push({
-      id: role.id,
+      id: String(role.id),
       key: role.key,
       name: role.name,
       permissions: permissionRows.map((p) => p.key),
@@ -124,16 +124,21 @@ export async function createUser(data: {
   const bcrypt = await import("bcryptjs");
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  const id = crypto.randomUUID();
-  await query(
-    `INSERT INTO User (id, email, username, password, name, position, isActive)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, email, username, hashedPassword, data.name, data.position ?? null, true]
-  );
+  const id = String(
+    await withTransaction(async (exec) => {
+      const insertId = await exec.insertId(
+        `INSERT INTO User (email, username, password, name, position, isActive)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [email, username, hashedPassword, data.name, data.position ?? null, true]
+      );
 
-  for (const roleId of data.roleIds) {
-    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, roleId]);
-  }
+      for (const roleId of data.roleIds) {
+        await exec.run(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [insertId, roleId]);
+      }
+
+      return insertId;
+    })
+  );
 
   const roles = await getRolesForUser(id);
   return mapUser(
@@ -162,7 +167,7 @@ export async function updateUser(
   }
 ) {
   const existing = (await query(`SELECT id FROM User WHERE id = ? LIMIT 1`, [id])) as {
-    id: string;
+    id: string | number;
   }[];
   if (existing.length === 0) {
     throw new ApiError(404, "User not found.");
@@ -189,10 +194,13 @@ export async function updateUser(
     await query(`UPDATE User SET password = ?, updatedAt = NOW() WHERE id = ?`, [hashed, id]);
   }
   if (data.roleIds !== undefined) {
-    await query(`DELETE FROM UserRole WHERE userId = ?`, [id]);
-    for (const roleId of data.roleIds) {
-      await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, roleId]);
-    }
+    const roleIds = data.roleIds;
+    await withTransaction(async (exec) => {
+      await exec.run(`DELETE FROM UserRole WHERE userId = ?`, [id]);
+      for (const roleId of roleIds) {
+        await exec.run(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, roleId]);
+      }
+    });
   }
 
   const user = await fetchUserWithRoles(id);
@@ -204,7 +212,7 @@ export async function updateUser(
 
 export async function deleteUser(id: string) {
   const existing = (await query(`SELECT id FROM User WHERE id = ? LIMIT 1`, [id])) as {
-    id: string;
+    id: string | number;
   }[];
   if (existing.length === 0) {
     throw new ApiError(404, "User not found.");

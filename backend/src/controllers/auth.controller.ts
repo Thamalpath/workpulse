@@ -8,17 +8,16 @@ import {
   verifyPassword,
 } from "../services/auth.service.js";
 import { ApiError } from "../utils/api-error.js";
-import { clearAuthCookie, COOKIE_NAME, setAuthCookie } from "../utils/cookie.js";
+import { clearAuthCookie, setAuthCookie } from "../utils/cookie.js";
 import { signToken } from "../utils/jwt.js";
 
 export async function register(req: Request, res: Response) {
-  const { name, email, username, password, position, roleKeys } = req.body as {
+  const { name, email, username, password, position } = req.body as {
     name: string;
     email: string;
     username: string;
     password: string;
     position?: string;
-    roleKeys?: string[];
   };
 
   const args: {
@@ -27,10 +26,8 @@ export async function register(req: Request, res: Response) {
     username: string;
     password: string;
     position?: string;
-    roleKeys?: string[];
   } = { name, email, username, password };
   if (position !== undefined) args.position = position;
-  if (roleKeys !== undefined) args.roleKeys = roleKeys;
 
   const result = await registerUser(args);
 
@@ -115,5 +112,3 @@ export async function changePassword(req: Request, res: Response) {
 
   res.json({ success: true, message: "Password updated." });
 }
-
-export { COOKIE_NAME };
