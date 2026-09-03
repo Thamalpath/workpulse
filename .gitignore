@@ -12,9 +12,8 @@ node_modules/
 !.env.example
 
 # =============================
-# Backend (Express + Prisma)
+# Backend (Express)
 # =============================
-backend/generated/
 backend/skills-lock.json
 backend/src/generated/
 backend/dist/
