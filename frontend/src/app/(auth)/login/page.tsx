@@ -2,22 +2,39 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 
 import { AuthHero } from "@/components/auth-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useAuth } from "@/contexts/auth-context";
+import { loginSchema, type LoginInput } from "@/lib/validations/auth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAuth();
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      identifier: "",
+      password: "",
+    },
+  });
+
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -29,21 +46,17 @@ export default function LoginPage() {
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setIsSubmitting(true);
-
+  async function onSubmit(data: LoginInput) {
     try {
-      await login(identifier, password);
+      await login(data.identifier, data.password);
+      toast.success("Welcome back! You have been signed in successfully.");
       router.replace("/dashboard");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error
           ? err.message
           : "Unable to sign in. Please try again.",
       );
-      setIsSubmitting(false);
     }
   }
 
@@ -79,63 +92,67 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {error && (
-            <div
-              role="alert"
-              className="mb-6 flex items-start gap-3 rounded-lg border border-[#C85C5C]/30 bg-[#C85C5C]/10 px-4 py-3 text-sm text-[#C85C5C]"
-            >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="email">Username or email</Label>
-              <Input
-                id="email"
-                type="text"
-                placeholder="admin@workpulse.com"
-                autoComplete="username"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                className="h-11"
-                required
+          <Form {...form}>
+            <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+              <FormField
+                control={form.control}
+                name="identifier"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="username"
+                        autoComplete="username"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11"
-                required
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <Button
-              className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
-              size="lg"
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign in
-                  <ArrowRight />
-                </>
-              )}
-            </Button>
-          </form>
+              <Button
+                className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
+                size="lg"
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    Sign in
+                    <ArrowRight />
+                  </>
+                )}
+              </Button>
+            </form>
+          </Form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

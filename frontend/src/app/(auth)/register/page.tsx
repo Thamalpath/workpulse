@@ -2,25 +2,42 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { AlertCircle, ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { useEffect } from "react";
+import { ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { toast } from "sonner";
 
 import { AuthHero } from "@/components/auth-hero";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useAuth } from "@/contexts/auth-context";
+import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isAuthenticated, isLoading } = useAuth();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<RegisterInput>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const isSubmitting = form.formState.isSubmitting;
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
@@ -32,22 +49,16 @@ export default function RegisterPage() {
     return null;
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  async function onSubmit(data: RegisterInput) {
+    const { confirmPassword: _, ...payload } = data;
     try {
-      await register({ name, email, username, password });
+      await register(payload);
+      toast.success("Account created successfully! Welcome to WorkPulse.");
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create your account.");
-      setIsSubmitting(false);
+      toast.error(
+        err instanceof Error ? err.message : "Unable to create your account.",
+      );
     }
   }
 
@@ -83,107 +94,126 @@ export default function RegisterPage() {
             </p>
           </div>
 
-          {error && (
-            <div
-              role="alert"
-              className="mb-6 flex items-start gap-3 rounded-lg border border-[#C85C5C]/30 bg-[#C85C5C]/10 px-4 py-3 text-sm text-[#C85C5C]"
-            >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="name">Full name</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="Jane Cooper"
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-11"
-                required
+          <Form {...form}>
+            <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Jane Cooper"
+                        autoComplete="name"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Work email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-11"
-                required
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Work email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="you@company.com"
+                        autoComplete="email"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="jane.cooper"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="h-11"
-                required
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="jane.cooper"
+                        autoComplete="username"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="new-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11"
-                minLength={6}
-                required
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-11"
-                required
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        className="h-11"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <Button
-              className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
-              size="lg"
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                <>
-                  Create account
-                  <ArrowRight />
-                </>
-              )}
-            </Button>
-          </form>
+              <Button
+                className="h-11 w-full bg-[#4263A3] text-white hover:bg-[#344F85]"
+                size="lg"
+                type="submit"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  <>
+                    Create account
+                    <ArrowRight />
+                  </>
+                )}
+              </Button>
+            </form>
+          </Form>
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Already have an account?{" "}
