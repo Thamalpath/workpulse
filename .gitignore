@@ -17,6 +17,7 @@ node_modules/
 backend/generated/
 backend/skills-lock.json
 backend/src/generated/
+backend/dist/
 
 # =============================
 # Frontend (Next.js)

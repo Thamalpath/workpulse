@@ -1,6 +1,6 @@
 import { validateBody } from "../middleware/validation.middleware.js";
 
-export const validateRegister = validateBody({
+export const validateCreateUser = validateBody({
   name: [{ required: true, message: "Name is required." }, { isString: true }],
   email: [
     { required: true, message: "Email is required." },
@@ -17,15 +17,8 @@ export const validateRegister = validateBody({
   ],
 });
 
-export const validateLogin = validateBody({
-  identifier: { required: true, message: "Username or email is required." },
-  password: { required: true, message: "Password is required." },
-});
-
-export const validateChangePassword = validateBody({
-  currentPassword: { required: true, message: "Current password is required." },
-  newPassword: [
-    { required: true, message: "New password is required." },
-    { minLength: 6, message: "New password must be at least 6 characters." },
-  ],
+export const validateUpdateUser = validateBody({
+  name: { isString: true },
+  position: { isString: true },
+  password: { minLength: 6, message: "Password must be at least 6 characters." },
 });

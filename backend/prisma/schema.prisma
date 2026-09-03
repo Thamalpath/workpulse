@@ -7,13 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-}
-
-enum Role {
-  MEMBER
-  MANAGER
-  ADMIN
+  provider = "mysql"
 }
 
 enum ReportStatus {
@@ -41,21 +35,67 @@ enum HoursCategory {
   OTHER
 }
 
+model Permission {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  description String?
+  module      String    @default("general")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  roles       RolePermission[]
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String
+  key         String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
 model User {
   id            String           @id @default(cuid())
   email         String           @unique
+  username      String           @unique
   password      String
   name          String
-  role          Role             @default(MEMBER)
   position      String?
   avatarUrl     String?
+  isActive      Boolean          @default(true)
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+  roles         UserRole[]
   userProjects  UserProject[]
   reports       Report[]
   reviewComments ReviewComment[]
   reviewedReports Report[]       @relation("ReportReviewedBy")
   reportVersionsCreated ReportVersion[] @relation("ReportVersionCreatedBy")
+}
+
+model UserRole {
+  userId   String
+  roleId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assignedAt DateTime @default(now())
+
+  @@id([userId, roleId])
+  @@index([roleId])
 }
 
 model Project {
