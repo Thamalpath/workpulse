@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import { findById } from "../services/auth.service.js";
 import { isSessionValid } from "../services/session.service.js";
 import { ApiError } from "../utils/api-error.js";
-import { SESSION_COOKIE } from "../utils/cookie.js";
+import { clearSessionCookie, SESSION_COOKIE } from "../utils/cookie.js";
 import { verifyToken } from "../utils/jwt.js";
 
 export type AuthedRequest = Request & {
@@ -28,6 +28,7 @@ async function attachAuth(req: AuthedRequest, res: Response, next: NextFunction,
 
   const payload = verifyToken(token);
   if (!payload) {
+    clearSessionCookie(res);
     if (!required) {
       return next();
     }
@@ -36,6 +37,7 @@ async function attachAuth(req: AuthedRequest, res: Response, next: NextFunction,
 
   const sessionValid = await isSessionValid(payload.jti);
   if (!sessionValid) {
+    clearSessionCookie(res);
     if (!required) {
       return next();
     }
@@ -44,6 +46,7 @@ async function attachAuth(req: AuthedRequest, res: Response, next: NextFunction,
 
   const user = await findById(payload.sub);
   if (!user || !user.isActive) {
+    clearSessionCookie(res);
     return next(new ApiError(401, "Session user no longer exists."));
   }
 
