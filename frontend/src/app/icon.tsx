@@ -1,15 +1,18 @@
+import fs from "node:fs";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
-import logo from "@/assets/Logo.png";
+export const runtime = "nodejs";
 
-export const runtime = "edge";
+const logoPath = path.join(process.cwd(), "src", "assets", "Logo.png");
+const logoData = fs.readFileSync(logoPath);
+const logoBase64 = `data:image/png;base64,${logoData.toString("base64")}`;
 
 export default function Icon() {
   return new ImageResponse(
     (
       <div
         style={{
-          fontSize: 24,
           background: "transparent",
           width: "100%",
           height: "100%",
@@ -20,7 +23,7 @@ export default function Icon() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={logo.src}
+          src={logoBase64}
           alt="WorkPulse"
           width={192}
           height={192}
