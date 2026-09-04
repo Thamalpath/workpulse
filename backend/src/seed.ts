@@ -107,9 +107,9 @@ async function seed() {
   } else if (adminRoleId) {
     const hashed = await bcrypt.hash(adminPassword, 10);
     const id = await insert(
-      `INSERT INTO User (name, email, username, password, position, isActive)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      ["Admin", adminEmail, adminUsername, hashed, "Administrator", 1]
+      `INSERT INTO User (name, email, username, password, isActive)
+       VALUES (?, ?, ?, ?, ?)`,
+      ["Admin", adminEmail, adminUsername, hashed, 1]
     );
     await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, adminRoleId]);
     console.log("Admin user created.");

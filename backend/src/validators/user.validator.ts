@@ -22,7 +22,6 @@ export const validateCreateUser = validateBody({
 
 export const validateUpdateUser = validateBody({
   name: { isString: true },
-  position: { isString: true },
   password: { minLength: 6, message: "Password must be at least 6 characters." },
   roleIds: [{ isArray: true, message: "roleIds must be an array of role IDs." }],
 });
