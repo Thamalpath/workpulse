@@ -35,7 +35,7 @@ function DatePicker({
         <Button
           variant="outline"
           className={cn(
-            "h-10 w-full justify-start gap-2 text-left font-normal",
+            "h-10 w-full justify-start gap-2 pr-3 pl-3 text-left font-normal whitespace-nowrap",
             !value && "text-muted-foreground",
             className,
           )}
