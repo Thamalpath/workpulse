@@ -35,6 +35,13 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    if (
+      res.status === 401 &&
+      typeof window !== "undefined" &&
+      !path.includes("/api/auth/")
+    ) {
+      window.dispatchEvent(new CustomEvent("workpulse:unauthorized"));
+    }
     throw new ApiError(res.status, body?.message ?? res.statusText);
   }
 
