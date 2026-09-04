@@ -7,8 +7,17 @@ import {
   registerUser,
   verifyPassword,
 } from "../services/auth.service.js";
+import {
+  createSession,
+  deleteAllUserSessions,
+  deleteSession,
+} from "../services/session.service.js";
 import { ApiError } from "../utils/api-error.js";
-import { clearAuthCookie, setAuthCookie } from "../utils/cookie.js";
+import {
+  clearSessionCookie,
+  setSessionCookie,
+  SESSION_COOKIE,
+} from "../utils/cookie.js";
 import { signToken } from "../utils/jwt.js";
 
 export async function register(req: Request, res: Response) {
@@ -31,8 +40,10 @@ export async function register(req: Request, res: Response) {
 
   const result = await registerUser(args);
 
-  const token = signToken(result.user.id);
-  setAuthCookie(res, token);
+  const jwtExpiry = process.env.JWT_EXPIRES_IN ?? "7d";
+  const session = await createSession(result.user.id, req.ip, req.headers["user-agent"]);
+  const jwt = signToken(result.user.id, session.token, jwtExpiry);
+  setSessionCookie(res, jwt, jwtExpiry);
 
   res.status(201).json({ success: true, data: result });
 }
@@ -64,8 +75,10 @@ export async function login(req: Request, res: Response) {
     permissions: role.permissions.map((p) => p.permission.key),
   }));
 
-  const token = signToken(user.id);
-  setAuthCookie(res, token);
+  const jwtExpiry = process.env.JWT_EXPIRES_IN ?? "7d";
+  const session = await createSession(user.id, req.ip, req.headers["user-agent"]);
+  const jwt = signToken(user.id, session.token, jwtExpiry);
+  setSessionCookie(res, jwt, jwtExpiry);
 
   res.json({
     success: true,
@@ -84,8 +97,23 @@ export async function login(req: Request, res: Response) {
   });
 }
 
-export async function logout(_req: Request, res: Response) {
-  clearAuthCookie(res);
+export async function logout(req: Request, res: Response) {
+  const jwtToken =
+    (req.cookies?.[SESSION_COOKIE] as string | undefined) ?? undefined;
+
+  if (jwtToken) {
+    try {
+      const { verifyToken } = await import("../utils/jwt.js");
+      const payload = verifyToken(jwtToken);
+      if (payload) {
+        await deleteSession(payload.jti);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  clearSessionCookie(res);
   res.json({ success: true, message: "Logged out." });
 }
 
@@ -109,6 +137,8 @@ export async function changePassword(req: Request, res: Response) {
   };
 
   await changePasswordService(userId, currentPassword, newPassword);
+  await deleteAllUserSessions(userId);
+  clearSessionCookie(res);
 
-  res.json({ success: true, message: "Password updated." });
+  res.json({ success: true, message: "Password updated. Please sign in again." });
 }

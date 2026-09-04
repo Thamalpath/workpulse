@@ -83,7 +83,7 @@ async function seed() {
   console.log("Seeding admin user...");
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@workpulse.com";
   const adminUsername = process.env.SEED_ADMIN_USERNAME ?? "admin";
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "1234";
 
   const adminRoleRows = (await query(
     `SELECT id FROM Role WHERE \`key\` = 'admin' LIMIT 1`

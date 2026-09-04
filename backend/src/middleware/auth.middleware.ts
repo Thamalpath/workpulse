@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { findById } from "../services/auth.service.js";
+import { isSessionValid } from "../services/session.service.js";
 import { ApiError } from "../utils/api-error.js";
-import { COOKIE_NAME } from "../utils/cookie.js";
+import { SESSION_COOKIE } from "../utils/cookie.js";
 import { verifyToken } from "../utils/jwt.js";
 
 export type AuthedRequest = Request & {
@@ -13,7 +14,7 @@ export type AuthedRequest = Request & {
 
 async function attachAuth(req: AuthedRequest, res: Response, next: NextFunction, required: boolean) {
   const token =
-    (req.cookies?.[COOKIE_NAME] as string | undefined) ??
+    (req.cookies?.[SESSION_COOKIE] as string | undefined) ??
     (req.headers.authorization?.startsWith("Bearer ")
       ? req.headers.authorization.slice(7)
       : undefined);
@@ -31,6 +32,14 @@ async function attachAuth(req: AuthedRequest, res: Response, next: NextFunction,
       return next();
     }
     return next(new ApiError(401, "Invalid or expired session."));
+  }
+
+  const sessionValid = await isSessionValid(payload.jti);
+  if (!sessionValid) {
+    if (!required) {
+      return next();
+    }
+    return next(new ApiError(401, "Session has been revoked."));
   }
 
   const user = await findById(payload.sub);

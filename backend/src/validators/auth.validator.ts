@@ -13,7 +13,7 @@ export const validateRegister = validateBody({
   ],
   password: [
     { required: true, message: "Password is required." },
-    { minLength: 6, message: "Password must be at least 6 characters." },
+    { minLength: 4, message: "Password must be at least 4 characters." },
   ],
 });
 
@@ -26,6 +26,6 @@ export const validateChangePassword = validateBody({
   currentPassword: { required: true, message: "Current password is required." },
   newPassword: [
     { required: true, message: "New password is required." },
-    { minLength: 6, message: "New password must be at least 6 characters." },
+    { minLength: 4, message: "New password must be at least 4 characters." },
   ],
 });

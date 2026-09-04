@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
 
 if (!JWT_SECRET) {
   throw new Error(
@@ -19,21 +18,22 @@ if (JWT_SECRET.length < 32) {
 
 export type JwtPayload = {
   sub: string;
+  jti: string;
 };
 
-export function signToken(userId: string): string {
-  const options: jwt.SignOptions = {};
-  options.expiresIn = JWT_EXPIRES_IN as NonNullable<jwt.SignOptions["expiresIn"]>;
-  return jwt.sign({ sub: userId }, JWT_SECRET, options);
+export function signToken(userId: string, sessionId: string, expiresIn: string): string {
+  return jwt.sign({ sub: userId, jti: sessionId }, JWT_SECRET, {
+    expiresIn: expiresIn as NonNullable<jwt.SignOptions["expiresIn"]>,
+  });
 }
 
 export function verifyToken(token: string): JwtPayload | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-    if (typeof decoded.sub !== "string") {
+    if (typeof decoded.sub !== "string" || typeof decoded.jti !== "string") {
       return null;
     }
-    return { sub: decoded.sub };
+    return { sub: decoded.sub, jti: decoded.jti };
   } catch {
     return null;
   }
