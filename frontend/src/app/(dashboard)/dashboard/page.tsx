@@ -34,7 +34,7 @@ const statusColor: Record<string, string> = {
 
 export default function DashboardPage() {
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[#18202F] sm:text-3xl">
