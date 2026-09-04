@@ -44,7 +44,7 @@ function isSessionTokenValid(token: string | undefined): boolean {
   }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const tokenCookie = request.cookies.get(AUTH_CONFIG.cookieName);
   const token = tokenCookie?.value;
