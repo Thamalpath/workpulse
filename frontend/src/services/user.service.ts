@@ -6,8 +6,6 @@ export type ManageUser = {
   email: string;
   username: string;
   name: string;
-  position: string | null;
-  avatarUrl: string | null;
   isActive: boolean;
   createdAt: string;
   roles: Role[];
@@ -36,13 +34,11 @@ export type CreateUserInput = {
   email: string;
   username: string;
   password: string;
-  position?: string;
   roleIds: string[];
 };
 
 export type UpdateUserInput = {
   name?: string;
-  position?: string;
   isActive?: boolean;
   roleIds?: string[];
   password?: string;

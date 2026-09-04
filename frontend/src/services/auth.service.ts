@@ -5,8 +5,6 @@ export type User = {
   email: string;
   username: string;
   name: string;
-  position: string | null;
-  avatarUrl: string | null;
   isActive: boolean;
 };
 
@@ -27,7 +25,6 @@ export type RegisterInput = {
   email: string;
   username: string;
   password: string;
-  position?: string;
 };
 
 export function login(identifier: string, password: string) {
