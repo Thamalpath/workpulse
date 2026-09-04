@@ -1,12 +1,13 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -195,14 +196,20 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const projectsFetched = useRef(false);
+
+  useEffect(() => {
+    if (projectsFetched.current) return;
+    projectsFetched.current = true;
+    void getProjects()
+      .then(setProjects)
+      .catch(() => setError("Failed to load projects."));
+  }, []);
+
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
-        const projData = await getProjects();
-        if (!active) return;
-        setProjects(projData);
-
         if (editId) {
           const report = await getReport(editId);
           if (!active) return;
@@ -217,11 +224,12 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           if (report.hoursWorked && report.hoursWorked.length > 0) setHoursWorked(report.hoursWorked);
         } else {
           const week = getCurrentWeekDates();
+          if (!active) return;
           setWeekStart(week.start);
           setWeekEnd(week.end);
         }
       } catch {
-        setError("Failed to load data.");
+        if (active) setError("Failed to load data.");
       } finally {
         if (active) setLoading(false);
       }
@@ -312,16 +320,26 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Week Start Date</Label>
-              <Input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} required />
+              <DatePicker
+                value={weekStart}
+                onChange={setWeekStart}
+                format="MMM d, yyyy"
+                placeholder="Select start date"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Week End Date</Label>
-              <Input type="date" value={weekEnd} onChange={(e) => setWeekEnd(e.target.value)} required />
+              <DatePicker
+                value={weekEnd}
+                onChange={setWeekEnd}
+                format="MMM d, yyyy"
+                placeholder="Select end date"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Project</Label>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                <SelectTrigger className="h-10"><SelectValue placeholder="Select project" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No project</SelectItem>
                   {projects.map((p) => (
@@ -469,7 +487,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
             {hoursWorked.map((h, i) => (
               <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Select value={h.category} onValueChange={(v) => updateHours(i, { ...h, category: v })}>
-                  <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Category" /></SelectTrigger>
                   <SelectContent>
                     {HOURS_CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
