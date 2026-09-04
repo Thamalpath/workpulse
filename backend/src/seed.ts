@@ -3,6 +3,13 @@ import bcrypt from "bcryptjs";
 import { insert, pool, query } from "./config/database.js";
 import { SEED_PERMISSIONS, SEED_ROLES } from "./constants/permissions.js";
 
+const SEED_PROJECTS = [
+  { key: "ATLAS", name: "Atlas CRM", description: "Customer relationship management platform" },
+  { key: "NIMBUS", name: "Nimbus Analytics", description: "Real-time analytics dashboard suite" },
+  { key: "ORION", name: "Orion Mobile App", description: "Mobile companion application" },
+  { key: "WKP", name: "WorkPulse Platform", description: "Internal weekly reporting platform" },
+];
+
 async function seed() {
   console.log("Seeding permissions...");
   const permissionIds: Record<string, string> = {};
@@ -113,6 +120,26 @@ async function seed() {
     );
     await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, adminRoleId]);
     console.log("Admin user created.");
+  }
+
+  console.log("Seeding projects...");
+  for (const proj of SEED_PROJECTS) {
+    const existing = (await query(
+      `SELECT id FROM Project WHERE \`key\` = ? LIMIT 1`,
+      [proj.key]
+    )) as { id: string | number }[];
+
+    if (existing[0]) {
+      await query(
+        `UPDATE Project SET name = ?, description = ?, isActive = 1, updatedAt = NOW() WHERE id = ?`,
+        [proj.name, proj.description, existing[0].id]
+      );
+    } else {
+      await insert(
+        `INSERT INTO Project (name, \`key\`, description, isActive) VALUES (?, ?, ?, 1)`,
+        [proj.name, proj.key, proj.description]
+      );
+    }
   }
 
   console.log("Seeding complete.");
