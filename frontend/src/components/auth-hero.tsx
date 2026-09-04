@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import heroImage from "@/assets/login-hero.jpg";
+import logo from "@/assets/Logo.png";
 
 export function AuthHero() {
   return (
@@ -32,13 +33,16 @@ export function AuthHero() {
 
       <div className="relative z-10 flex h-full flex-col p-12">
         <div className="flex items-center gap-2.5">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-white/10 shadow-lg shadow-black/20 backdrop-blur-md ring-1 ring-white/20">
-            <Sparkles className="size-5" />
-          </div>
-
-          <span className="text-xl font-semibold tracking-tight">
-            WorkPulse
-          </span>
+          <Image
+            src={logo.src}
+            alt="WorkPulse logo"
+            unoptimized
+            width={160}
+            height={40}
+            priority
+            className="h-12 w-auto object-contain"
+          />
+          <span className="text-xl font-bold text-white">Workpulse</span>
         </div>
 
         <div className="flex flex-1 items-center">
