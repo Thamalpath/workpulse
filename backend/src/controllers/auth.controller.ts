@@ -21,12 +21,11 @@ import {
 import { signToken } from "../utils/jwt.js";
 
 export async function register(req: Request, res: Response) {
-  const { name, email, username, password, position } = req.body as {
+  const { name, email, username, password } = req.body as {
     name: string;
     email: string;
     username: string;
     password: string;
-    position?: string;
   };
 
   const args: {
@@ -34,9 +33,7 @@ export async function register(req: Request, res: Response) {
     email: string;
     username: string;
     password: string;
-    position?: string;
   } = { name, email, username, password };
-  if (position !== undefined) args.position = position;
 
   const result = await registerUser(args);
 
@@ -88,8 +85,6 @@ export async function login(req: Request, res: Response) {
         email: user.email,
         username: user.username,
         name: user.name,
-        position: user.position,
-        avatarUrl: user.avatarUrl,
         isActive: user.isActive,
       },
       roles,

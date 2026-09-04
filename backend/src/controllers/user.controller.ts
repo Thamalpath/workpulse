@@ -21,12 +21,11 @@ export async function getUser(req: Request, res: Response) {
 }
 
 export async function postUser(req: Request, res: Response) {
-  const { name, email, username, password, position, roleIds = [] } = req.body as {
+  const { name, email, username, password, roleIds = [] } = req.body as {
     name: string;
     email: string;
     username: string;
     password: string;
-    position?: string;
     roleIds?: string[];
   };
 
@@ -35,10 +34,8 @@ export async function postUser(req: Request, res: Response) {
     email: string;
     username: string;
     password: string;
-    position?: string;
     roleIds: string[];
   } = { name, email, username, password, roleIds };
-  if (position !== undefined) args.position = position;
 
   const user = await createUser(args);
   res.status(201).json({ success: true, data: user });
@@ -47,9 +44,8 @@ export async function postUser(req: Request, res: Response) {
 export async function patchUser(req: Request, res: Response) {
   const id = req.params.id as string;
   const userId = (req as Request & { userId?: string }).userId;
-  const { name, position, isActive, roleIds, password } = req.body as {
+  const { name, isActive, roleIds, password } = req.body as {
     name?: string;
-    position?: string;
     isActive?: boolean;
     roleIds?: string[];
     password?: string;
@@ -61,13 +57,11 @@ export async function patchUser(req: Request, res: Response) {
 
   const args: {
     name?: string;
-    position?: string;
     isActive?: boolean;
     roleIds?: string[];
     password?: string;
   } = {};
   if (name !== undefined) args.name = name;
-  if (position !== undefined) args.position = position;
   if (isActive !== undefined) args.isActive = isActive;
   if (roleIds !== undefined) args.roleIds = roleIds;
   if (password !== undefined && password !== "") args.password = password;
