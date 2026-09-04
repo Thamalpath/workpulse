@@ -35,7 +35,7 @@ function DatePicker({
         <Button
           variant="outline"
           className={cn(
-            "h-10 w-full justify-start gap-2 pr-3 pl-3 text-left font-normal whitespace-nowrap",
+            "h-9 w-full justify-start gap-2 pr-3 pl-3 text-left font-normal whitespace-nowrap",
             !value && "text-muted-foreground",
             className,
           )}
@@ -44,7 +44,10 @@ function DatePicker({
           {value ? format(selected!, formatString) : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        className="w-max max-w-[calc(100vw-2rem)] p-0"
+        align="start"
+      >
         <Calendar
           mode="single"
           selected={selected}
