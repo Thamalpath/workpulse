@@ -12,14 +12,27 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <AuthGuard>
       <div className="flex min-h-screen w-full bg-[#F5F7FA]">
-        <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
+        <Sidebar
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          collapsed={collapsed}
+        />
 
-        <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
-          <Navbar onOpenSidebar={() => setMobileOpen(true)} />
+        <div
+          className={`flex min-w-0 flex-1 flex-col transition-all duration-300 ${
+            collapsed ? "lg:pl-18" : "lg:pl-64"
+          }`}
+        >
+          <Navbar
+            onOpenSidebar={() => setMobileOpen(true)}
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed(!collapsed)}
+          />
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>

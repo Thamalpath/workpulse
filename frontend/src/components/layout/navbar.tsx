@@ -1,14 +1,31 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, LogOut, Menu } from "lucide-react";
+import {
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings,
+  User,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { navigationItems } from "@/components/layout/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 type NavbarProps = {
   onOpenSidebar: () => void;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
 };
 
 function UserMenu() {
@@ -35,25 +52,61 @@ function UserMenu() {
         </p>
       </div>
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className="text-[#596273] hover:text-[#C85C5C]"
+        className="h-9 w-9 text-[#596273] border-[#E1E6ED] hover:bg-[#FEE2E2] hover:text-[#C85C5C] hover:border-[#FECACA] transition-colors"
         onClick={handleLogout}
         aria-label="Sign out"
       >
-        <LogOut className="size-4.5" />
+        <LogOut className="size-4" />
       </Button>
     </div>
   );
 }
 
-export function Navbar({ onOpenSidebar }: NavbarProps) {
+export function Navbar({
+  onOpenSidebar,
+  collapsed,
+  onToggleCollapse,
+}: NavbarProps) {
   const pathname = usePathname();
 
+  const segments = pathname.split("/").filter(Boolean);
   const currentLabel =
     navigationItems.find(
-      (item) => pathname === item.href || pathname.startsWith(item.href + "/")
+      (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
     )?.label ?? "Dashboard";
+
+  function getBreadcrumbItems() {
+    const items: { label: string; href: string }[] = [];
+
+    if (segments[0] === "dashboard") {
+      items.push({ label: "Dashboard", href: "/dashboard" });
+    } else if (segments[0] === "projects") {
+      items.push({ label: "Projects", href: "/projects" });
+    } else if (segments[0] === "reports") {
+      items.push({ label: "Reports", href: "/reports" });
+      if (segments[1] === "create") {
+        items.push({ label: "Create", href: "/reports/create" });
+      } else if (segments[1]) {
+        items.push({ label: "Details", href: `/reports/${segments[1]}` });
+      }
+    } else if (segments[0] === "users") {
+      items.push({ label: "Users", href: "/users" });
+      if (segments[1]) {
+        items.push({ label: "Details", href: `/users/${segments[1]}` });
+      }
+    } else if (segments[0] === "team-members") {
+      items.push({ label: "Team Members", href: "/team-members" });
+      if (segments[1]) {
+        items.push({ label: "Details", href: `/team-members/${segments[1]}` });
+      }
+    }
+
+    return items;
+  }
+
+  const breadcrumbItems = getBreadcrumbItems();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-[#E1E6ED] bg-white/90 px-4 backdrop-blur sm:px-6">
@@ -61,29 +114,56 @@ export function Navbar({ onOpenSidebar }: NavbarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden"
+          className="hidden lg:inline-flex text-[#596273] hover:bg-[#E1E6ED]/60 hover:text-[#18202F]"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="size-5" />
+          ) : (
+            <PanelLeftClose className="size-5" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden text-[#596273] hover:bg-[#E1E6ED]/60 hover:text-[#18202F]"
           onClick={onOpenSidebar}
           aria-label="Open menu"
         >
           <Menu className="size-5" />
         </Button>
-        <div className="flex items-center gap-2 text-[#596273]">
-          <Activity className="size-4 text-[#38B8C4]" />
-          <span className="hidden text-sm font-medium sm:block">
-            {currentLabel}
-          </span>
-        </div>
+        <Breadcrumb>
+          <BreadcrumbList>
+            {breadcrumbItems.flatMap((item, index) => {
+              const isLast = index === breadcrumbItems.length - 1;
+              const elements = [
+                <BreadcrumbItem key={item.href}>
+                  {isLast ? (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink href={item.href}>
+                      {item.label}
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>,
+              ];
+              if (!isLast) {
+                elements.push(
+                  <BreadcrumbSeparator key={`sep-${item.href}`} />,
+                );
+              }
+              return elements;
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
       </div>
 
       <div className="flex items-center gap-2 lg:hidden">
         <UserMenu />
       </div>
 
-      <div className="hidden items-center gap-6 lg:flex">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#3C8C7A]/10 px-3 py-1 text-xs font-semibold text-[#3C8C7A]">
-          <span className="size-1.5 rounded-full bg-[#3C8C7A]" />
-          Online
-        </span>
+      <div className="hidden items-center gap-3 lg:flex">
         <UserMenu />
       </div>
     </header>

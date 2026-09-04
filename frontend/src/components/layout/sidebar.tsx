@@ -17,7 +17,7 @@ export const navigationItems = [
   { label: "Users", href: "/users", icon: Users, adminOnly: true },
 ];
 
-export function SidebarContent() {
+export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { permissions } = useAuth();
 
@@ -30,7 +30,10 @@ export function SidebarContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/dashboard" className="flex items-center gap-2.5">
+      <Link
+        href="/dashboard"
+        className={`flex items-center gap-2.5 ${collapsed ? "justify-center" : ""}`}
+      >
         <Image
           src={logo.src}
           alt="WorkPulse logo"
@@ -38,9 +41,11 @@ export function SidebarContent() {
           width={40}
           height={20}
           priority
-          className="h-12 w-auto object-contain"
+          className="h-10 w-auto object-contain"
         />
-        <span className="text-xl font-bold text-[#18202F]">Workpulse</span>
+        {!collapsed && (
+          <span className="text-xl font-bold text-[#18202F]">Workpulse</span>
+        )}
       </Link>
 
       <nav className="space-y-1">
@@ -54,13 +59,15 @@ export function SidebarContent() {
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                collapsed ? "justify-center px-2" : "px-3",
                 isActive
                   ? "bg-[#4263A3] text-white shadow-sm"
                   : "text-[#596273] hover:bg-[#E1E6ED]/60 hover:text-[#18202F]",
               )}
+              title={collapsed ? item.label : undefined}
             >
-              <Icon className="size-4.5" />
-              {item.label}
+              <Icon className="size-5 shrink-0" />
+              {!collapsed && <span>{item.label}</span>}
             </Link>
           );
         })}
@@ -72,13 +79,18 @@ export function SidebarContent() {
 type SidebarProps = {
   open: boolean;
   onClose: () => void;
+  collapsed?: boolean;
 };
 
-export function Sidebar({ open, onClose }: SidebarProps) {
+export function Sidebar({ open, onClose, collapsed = false }: SidebarProps) {
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-[#E1E6ED] bg-white px-5 py-6 lg:flex">
-        <SidebarContent />
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-[#E1E6ED] bg-white py-6 transition-all duration-300 lg:flex ${
+          collapsed ? "w-18 px-2" : "w-64 px-5"
+        }`}
+      >
+        <SidebarContent collapsed={collapsed} />
       </aside>
 
       {open && (
