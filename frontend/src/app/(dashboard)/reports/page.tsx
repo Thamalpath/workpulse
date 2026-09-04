@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/table";
 import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
+import { useConfirm } from "@/hooks/use-confirm";
+import { encodeId } from "@/lib/id";
 import {
   getMyReports,
   getAllReports,
@@ -47,6 +49,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [confirm, confirmNode] = useConfirm();
 
   const refresh = useCallback(async () => {
     try {
@@ -64,7 +67,7 @@ export default function ReportsPage() {
   }, [refresh]);
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this report? This cannot be undone.")) return;
+    if (!(await confirm({ title: "Delete report", message: "Delete this report? This cannot be undone.", destructive: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteReport(id);
       await refresh();
@@ -74,7 +77,7 @@ export default function ReportsPage() {
   }
 
   async function handleSubmit(id: string) {
-    if (!window.confirm("Submit this report for review?")) return;
+    if (!(await confirm({ title: "Submit report", message: "Submit this report for review?" }))) return;
     try {
       await submitReport(id);
       await refresh();
@@ -84,7 +87,7 @@ export default function ReportsPage() {
   }
 
   async function handleApprove(id: string) {
-    if (!window.confirm("Approve this report?")) return;
+    if (!(await confirm({ title: "Approve report", message: "Approve this report?" }))) return;
     try {
       await approveReport(id);
       await refresh();
@@ -94,7 +97,7 @@ export default function ReportsPage() {
   }
 
   async function handleRequestCorrection(id: string) {
-    if (!window.confirm("Request correction for this report?")) return;
+    if (!(await confirm({ title: "Request correction", message: "Request correction for this report?" }))) return;
     try {
       await requestCorrection(id);
       await refresh();
@@ -104,7 +107,10 @@ export default function ReportsPage() {
   }
 
   function formatDate(dateStr: string) {
-    const d = new Date(dateStr);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    const d = match
+      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+      : new Date(dateStr);
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   }
 
@@ -219,7 +225,7 @@ export default function ReportsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => router.push(`/reports/${report.id}`)}
+                          onClick={() => router.push(`/reports/${encodeId(report.id)}`)}
                           aria-label="View report"
                         >
                           <ArrowRight className="size-4" />
@@ -228,7 +234,7 @@ export default function ReportsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => router.push(`/reports/${report.id}/edit`)}
+                            onClick={() => router.push(`/reports/${encodeId(report.id)}/edit`)}
                             aria-label="Edit report"
                           >
                             <Pencil className="size-4" />
@@ -286,6 +292,8 @@ export default function ReportsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {confirmNode}
     </div>
   );
 }

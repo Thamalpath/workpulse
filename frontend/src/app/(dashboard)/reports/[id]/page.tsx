@@ -8,6 +8,7 @@ import {
   CheckCircle,
   Clock,
   FileText,
+  ListTree,
   Pencil,
   RotateCcw,
   Send,
@@ -28,6 +29,8 @@ import {
 } from "@/components/ui/table";
 import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
+import { useConfirm } from "@/hooks/use-confirm";
+import { decodeId, encodeId } from "@/lib/id";
 import {
   getReport,
   submitReport,
@@ -39,7 +42,11 @@ import {
 } from "@/services/report.service";
 
 function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-US", {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  const d = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(dateStr);
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -58,6 +65,7 @@ export default function ReportDetailPage({
   const router = useRouter();
   const { permissions, user } = useAuth();
   const canApprove = permissions.includes("report.approve");
+  const [confirm, confirmNode] = useConfirm();
 
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +74,7 @@ export default function ReportDetailPage({
   const fetchReport = useCallback(async () => {
     try {
       const resolvedParams = await params;
-      const data = await getReport(resolvedParams.id);
+      const data = await getReport(decodeId(resolvedParams.id));
       setReport(data);
     } catch {
       setError("Report not found.");
@@ -81,7 +89,7 @@ export default function ReportDetailPage({
 
   async function handleSubmit() {
     if (!report) return;
-    if (!window.confirm("Submit this report for review?")) return;
+    if (!(await confirm({ title: "Submit report", message: "Submit this report for review?" }))) return;
     try {
       await submitReport(report.id);
       await fetchReport();
@@ -92,7 +100,7 @@ export default function ReportDetailPage({
 
   async function handleApprove() {
     if (!report) return;
-    if (!window.confirm("Approve this report?")) return;
+    if (!(await confirm({ title: "Approve report", message: "Approve this report?" }))) return;
     try {
       await approveReport(report.id);
       await fetchReport();
@@ -103,7 +111,7 @@ export default function ReportDetailPage({
 
   async function handleCorrection() {
     if (!report) return;
-    if (!window.confirm("Request correction for this report?")) return;
+    if (!(await confirm({ title: "Request correction", message: "Request correction for this report?" }))) return;
     try {
       await requestCorrection(report.id);
       await fetchReport();
@@ -138,10 +146,28 @@ export default function ReportDetailPage({
   const keyBlockers = report.blockers?.filter((b) => b.isKeyIssue).length ?? 0;
   const keyAchievements = report.achievements?.filter((a) => a.isKeyAchievement).length ?? 0;
 
+  const sections = [
+    { id: "overview", label: "Overview" },
+    { id: "notes", label: "Notes" },
+    { id: "tasks", label: "Tasks" },
+    { id: "next-week", label: "Next Week" },
+    { id: "blockers", label: "Blockers" },
+    { id: "achievements", label: "Achievements" },
+    { id: "hours", label: "Hours" },
+  ].filter((s) =>
+    s.id === "overview" ||
+    (s.id === "notes" && !!report.notes) ||
+    (s.id === "tasks" && (report.tasks?.length ?? 0) > 0) ||
+    (s.id === "next-week" && (report.nextWeekTasks?.length ?? 0) > 0) ||
+    (s.id === "blockers" && (report.blockers?.length ?? 0) > 0) ||
+    (s.id === "achievements" && (report.achievements?.length ?? 0) > 0) ||
+    (s.id === "hours" && (report.hoursWorked?.length ?? 0) > 0),
+  );
+
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 xl:max-w-6xl 2xl:max-w-[1600px]">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div id="overview" className="flex scroll-mt-24 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
             href="/reports"
@@ -164,7 +190,7 @@ export default function ReportDetailPage({
           </span>
           {canEditOwn && (
             <Button asChild variant="outline" size="sm">
-              <Link href={`/reports/${report.id}/edit`}>
+              <Link href={`/reports/${encodeId(report.id)}/edit`}>
                 <Pencil className="size-4" /> Edit
               </Link>
             </Button>
@@ -187,8 +213,22 @@ export default function ReportDetailPage({
         </div>
       </div>
 
+      {/* Section Nav */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E1E6ED] bg-white p-2 shadow-sm">
+        <ListTree className="ml-2 size-4 shrink-0 text-[#4263A3]" />
+        {sections.map((section) => (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-[#F5F7FA] hover:text-[#4263A3]"
+          >
+            {section.label}
+          </a>
+        ))}
+      </div>
+
       {/* Stats Row */}
-      <div className="grid gap-4 sm:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-xl border border-[#E1E6ED] bg-white p-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Target className="size-4" />
@@ -221,7 +261,7 @@ export default function ReportDetailPage({
 
       {/* Notes */}
       {report.notes && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="notes" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-2">Notes</h3>
           <p className="text-sm text-[#18202F] whitespace-pre-wrap">{report.notes}</p>
         </div>
@@ -229,7 +269,7 @@ export default function ReportDetailPage({
 
       {/* Tasks Completed */}
       {report.tasks && report.tasks.length > 0 && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="tasks" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-4">Tasks Completed</h3>
           <Table>
             <TableHeader>
@@ -268,9 +308,9 @@ export default function ReportDetailPage({
 
       {/* Next Week Tasks */}
       {report.nextWeekTasks && report.nextWeekTasks.length > 0 && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="next-week" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-4">Planned for Next Week</h3>
-          <div className="space-y-2">
+          <div className="grid gap-2 2xl:grid-cols-2">
             {report.nextWeekTasks.map((task, i) => (
               <div key={i} className="flex items-center gap-3 rounded-lg bg-[#F5F7FA] px-4 py-2.5">
                 <Badge variant={task.priority === "critical" || task.priority === "high" ? "destructive" : "secondary"} className="shrink-0">
@@ -286,9 +326,9 @@ export default function ReportDetailPage({
 
       {/* Blockers */}
       {report.blockers && report.blockers.length > 0 && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="blockers" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-4">Blockers / Challenges</h3>
-          <div className="space-y-2">
+          <div className="grid gap-2 2xl:grid-cols-2">
             {report.blockers.map((blocker, i) => (
               <div key={i} className="flex items-start gap-3 rounded-lg bg-[#FFF7ED] border border-orange-200 px-4 py-3">
                 <AlertTriangle className="size-4 shrink-0 mt-0.5 text-orange-500" />
@@ -306,9 +346,9 @@ export default function ReportDetailPage({
 
       {/* Achievements */}
       {report.achievements && report.achievements.length > 0 && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="achievements" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-4">Achievements / Highlights</h3>
-          <div className="space-y-2">
+          <div className="grid gap-2 2xl:grid-cols-2">
             {report.achievements.map((achievement, i) => (
               <div key={i} className="flex items-start gap-3 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
                 <Star className="size-4 shrink-0 mt-0.5 text-green-600" />
@@ -326,7 +366,7 @@ export default function ReportDetailPage({
 
       {/* Hours Worked */}
       {report.hoursWorked && report.hoursWorked.length > 0 && (
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+        <div id="hours" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3] mb-4">Hours Worked</h3>
           <Table>
             <TableHeader>
@@ -356,6 +396,8 @@ export default function ReportDetailPage({
         <span>Report by {report.userName}</span>
         <span>Created {formatDate(report.createdAt)} · Updated {formatDate(report.updatedAt)}</span>
       </div>
+
+      {confirmNode}
     </div>
   );
 }

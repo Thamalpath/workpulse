@@ -315,7 +315,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         {error && <p className="text-sm text-[#C85C5C]">{error}</p>}
 
         {/* Basic Info */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="details" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <SectionHeader title="Report Details" />
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-1.5">
@@ -339,7 +339,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
             <div className="space-y-1.5">
               <Label>Project</Label>
               <Select value={projectId} onValueChange={setProjectId}>
-                <SelectTrigger className="h-10"><SelectValue placeholder="Select project" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No project</SelectItem>
                   {projects.map((p) => (
@@ -356,7 +356,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         </div>
 
         {/* Tasks Completed */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="tasks" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <SectionHeader title="Tasks Completed" />
             <Button type="button" variant="outline" size="sm" onClick={() => setTasks((prev) => [...prev, emptyTask()])}>
@@ -372,7 +372,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         </div>
 
         {/* Next Week Tasks */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="next-week" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <SectionHeader title="Planned for Next Week" />
             <Button type="button" variant="outline" size="sm" onClick={() => setNextWeekTasks((prev) => [...prev, emptyNextWeekTask()])}>
@@ -410,7 +410,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         </div>
 
         {/* Blockers */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="blockers" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <SectionHeader title="Blockers / Challenges" />
             <Button type="button" variant="outline" size="sm" onClick={() => setBlockers((prev) => [...prev, emptyBlocker()])}>
@@ -443,7 +443,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         </div>
 
         {/* Achievements */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="achievements" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <SectionHeader title="Achievements / Highlights" />
             <Button type="button" variant="outline" size="sm" onClick={() => setAchievements((prev) => [...prev, emptyAchievement()])}>
@@ -476,7 +476,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         </div>
 
         {/* Hours Worked */}
-        <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
+        <div id="hours" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <SectionHeader title="Hours Worked by Category" />
             <Button type="button" variant="outline" size="sm" onClick={() => setHoursWorked((prev) => [...prev, emptyHours()])}>

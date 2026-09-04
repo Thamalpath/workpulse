@@ -35,6 +35,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
+import { useConfirm } from "@/hooks/use-confirm";
 import { ApiError } from "@/lib/api";
 import {
   createRole,
@@ -459,6 +460,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [userDialog, setUserDialog] = useState<UserDialogState>(null);
   const [roleDialog, setRoleDialog] = useState<RoleDialogState>(null);
+  const [confirm, confirmNode] = useConfirm();
 
   const refresh = useCallback(async () => {
     const [userData, roleData, permissionData] = await Promise.all([
@@ -479,7 +481,7 @@ export default function UsersPage() {
   }, [refresh]);
 
   async function handleDeleteUser(user: ManageUser) {
-    if (!window.confirm(`Delete ${user.name}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Delete user", message: `Delete ${user.name}? This cannot be undone.`, destructive: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteUser(user.id);
       await refresh();
@@ -489,7 +491,7 @@ export default function UsersPage() {
   }
 
   async function handleDeleteRole(role: ManagedRole) {
-    if (!window.confirm(`Delete the "${role.name}" role?`)) return;
+    if (!(await confirm({ title: "Delete role", message: `Delete the "${role.name}" role?`, destructive: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteRole(role.id);
       await refresh();
@@ -754,6 +756,8 @@ export default function UsersPage() {
           onSaved={refresh}
         />
       )}
+
+      {confirmNode}
     </div>
   );
 }
