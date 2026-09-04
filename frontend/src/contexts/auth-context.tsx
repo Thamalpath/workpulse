@@ -9,8 +9,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 
+import { AUTH_CONFIG } from "@/config/auth";
 import {
   getMe,
   login as loginRequest,
@@ -31,62 +32,69 @@ type AuthContextValue = {
   login: (identifier: string, password: string) => Promise<void>;
   register: (data: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<AuthResponse | null>;
+  hasRole: (roleKey: string) => boolean;
+  hasAnyRole: (roleKeys: string[]) => boolean;
+  hasPermission: (permissionKey: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const sessionChecked = useRef(false);
 
-  const isAuthPage =
-    pathname === "/login" ||
-    pathname === "/register" ||
-    pathname === "/" ||
-    pathname === undefined;
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadSession() {
-      try {
-        const data = await getMe();
-        if (!active) return;
-        applySession(data);
-      } catch {
-        if (!active) return;
-        setUser(null);
-        setRoles([]);
-        setPermissions([]);
-      } finally {
-        if (active) setIsLoading(false);
-      }
-    }
-
-    if (!sessionChecked.current && !isAuthPage) {
-      sessionChecked.current = true;
-      void loadSession();
-    } else if (isAuthPage) {
-      setIsLoading(false);
-      sessionChecked.current = true;
-    }
-
-    return () => {
-      active = false;
-    };
-  }, [isAuthPage]);
-
   function applySession(data: AuthResponse) {
     setUser(data.user);
     setRoles(data.roles);
     setPermissions(
-      Array.from(new Set(data.roles.flatMap((role) => role.permissions)))
+      Array.from(new Set(data.roles.flatMap((role) => role.permissions))),
     );
   }
+
+  function clearSession() {
+    setUser(null);
+    setRoles([]);
+    setPermissions([]);
+  }
+
+  const refreshSession = useCallback(async (): Promise<AuthResponse | null> => {
+    try {
+      const data = await getMe();
+      applySession(data);
+      return data;
+    } catch {
+      clearSession();
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial session hydration
+  useEffect(() => {
+    if (!sessionChecked.current) {
+      sessionChecked.current = true;
+      void refreshSession();
+    }
+  }, [refreshSession]);
+
+  // Handle global 401 session expiration / revocation
+  useEffect(() => {
+    function handleUnauthorized() {
+      clearSession();
+      router.replace(AUTH_CONFIG.routes.login);
+    }
+
+    window.addEventListener("workpulse:unauthorized", handleUnauthorized);
+    return () => {
+      window.removeEventListener("workpulse:unauthorized", handleUnauthorized);
+    };
+  }, [router]);
 
   const login = useCallback(async (identifier: string, password: string) => {
     const data = await loginRequest(identifier, password);
@@ -104,10 +112,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore network errors on logout; always clear the local session.
     }
-    setUser(null);
-    setRoles([]);
-    setPermissions([]);
+    clearSession();
   }, []);
+
+  // RBAC helper utilities
+  const hasRole = useCallback(
+    (roleKey: string) => {
+      return roles.some((r) => r.key === roleKey);
+    },
+    [roles],
+  );
+
+  const hasAnyRole = useCallback(
+    (roleKeys: string[]) => {
+      return roles.some((r) => roleKeys.includes(r.key));
+    },
+    [roles],
+  );
+
+  const hasPermission = useCallback(
+    (permissionKey: string) => {
+      return permissions.includes(permissionKey);
+    },
+    [permissions],
+  );
 
   return (
     <AuthContext.Provider
@@ -120,6 +148,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshSession,
+        hasRole,
+        hasAnyRole,
+        hasPermission,
       }}
     >
       {children}
