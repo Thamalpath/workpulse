@@ -13,6 +13,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -122,7 +123,6 @@ function UserDialog({
   const [name, setName] = useState(editing?.name ?? "");
   const [email, setEmail] = useState(editing?.email ?? "");
   const [username, setUsername] = useState(editing?.username ?? "");
-  const [position, setPosition] = useState(editing?.position ?? "");
   const [password, setPassword] = useState("");
   const [isActive, setIsActive] = useState(editing?.isActive ?? true);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(
@@ -147,13 +147,12 @@ function UserDialog({
       if (editing) {
         await updateUser(editing.id, {
           name,
-          position: position || undefined,
           isActive,
           roleIds: selectedRoles,
           password: password || undefined,
         });
       } else {
-        await createUser({ name, email, username, password, position, roleIds: selectedRoles });
+        await createUser({ name, email, username, password, roleIds: selectedRoles });
       }
       await onSaved();
       onClose();
@@ -211,16 +210,6 @@ function UserDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="user-position">Position</Label>
-            <Input
-              id="user-position"
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              placeholder="e.g. Software Engineer"
-            />
-          </div>
-
-          <div className="space-y-1.5">
             <Label htmlFor="user-password">
               {editing ? "New password (optional)" : "Password"}
             </Label>
@@ -259,11 +248,9 @@ function UserDialog({
 
           {editing && (
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="size-4 rounded border-[#E1E6ED] text-[#4263A3]"
+                onCheckedChange={setIsActive}
               />
               Active
             </label>
@@ -422,11 +409,9 @@ function RoleDialog({
                       key={permission.id}
                       className="flex items-center gap-2 text-sm"
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selectedPermissions.has(permission.id)}
-                        onChange={() => togglePermission(permission.id)}
-                        className="size-4 rounded border-[#E1E6ED] text-[#4263A3]"
+                        onCheckedChange={() => togglePermission(permission.id)}
                       />
                       {permission.name}
                     </label>
@@ -575,7 +560,6 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Username</TableHead>
-                    <TableHead>Position</TableHead>
                     <TableHead>Roles</TableHead>
                     <TableHead>Status</TableHead>
                     {canUpdateUsers && <TableHead className="text-right">Actions</TableHead>}
@@ -592,9 +576,6 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {user.username}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {user.position || "—"}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -407,9 +408,12 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
                 <Textarea placeholder="Describe the blocker..." value={blocker.description} className="flex-1 min-h-0"
                   onChange={(e) => updateBlocker(i, { ...blocker, description: e.target.value })} />
                 <label className="flex items-center gap-2 text-sm whitespace-nowrap pt-2">
-                  <input type="checkbox" checked={blocker.isKeyIssue}
-                    onChange={(e) => updateBlocker(i, { ...blocker, isKeyIssue: e.target.checked })}
-                    className="size-4 rounded border-[#E1E6ED] text-[#4263A3]" />
+                  <Checkbox
+                    checked={blocker.isKeyIssue}
+                    onCheckedChange={(checked) =>
+                      updateBlocker(i, { ...blocker, isKeyIssue: checked })
+                    }
+                  />
                   Key issue
                 </label>
                 <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
@@ -435,9 +439,12 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
                 <Textarea placeholder="Describe the achievement..." value={achievement.description} className="flex-1 min-h-0"
                   onChange={(e) => updateAchievement(i, { ...achievement, description: e.target.value })} />
                 <label className="flex items-center gap-2 text-sm whitespace-nowrap pt-2">
-                  <input type="checkbox" checked={achievement.isKeyAchievement}
-                    onChange={(e) => updateAchievement(i, { ...achievement, isKeyAchievement: e.target.checked })}
-                    className="size-4 rounded border-[#E1E6ED] text-[#4263A3]" />
+                  <Checkbox
+                    checked={achievement.isKeyAchievement}
+                    onCheckedChange={(checked) =>
+                      updateAchievement(i, { ...achievement, isKeyAchievement: checked })
+                    }
+                  />
                   Key
                 </label>
                 <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
