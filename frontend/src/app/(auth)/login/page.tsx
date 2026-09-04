@@ -22,6 +22,7 @@ import {
 import { AUTH_CONFIG } from "@/config/auth";
 import { useAuth } from "@/contexts/auth-context";
 import { loginSchema, type LoginInput } from "@/lib/validations/auth";
+import { Loader } from "@/components/loader";
 
 function LoginForm() {
   const router = useRouter();
@@ -50,9 +51,11 @@ function LoginForm() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-[#F5F7FA]">
-        <div className="flex flex-col items-center gap-4 text-muted-foreground animate-pulse">
-          <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-          <span className="text-sm font-medium">Verifying session…</span>
+        <div className="flex flex-col items-center gap-4">
+          <Loader size={56} />
+          <span className="text-sm font-medium text-muted-foreground">
+            Verifying session…
+          </span>
         </div>
       </div>
     );
@@ -186,10 +189,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen w-full items-center justify-center bg-[#F5F7FA]">
-          <div className="flex flex-col items-center gap-4 text-muted-foreground animate-pulse">
-            <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-            <span className="text-sm font-medium">Loading…</span>
-          </div>
+          <Loader size={56} />
         </div>
       }
     >

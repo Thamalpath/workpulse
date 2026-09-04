@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  turbopack: {
+    rules: {
+      "*.lottie": { type: "asset" },
+    },
+  },
 };
 
 export default nextConfig;

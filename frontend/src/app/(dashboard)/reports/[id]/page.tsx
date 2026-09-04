@@ -8,7 +8,6 @@ import {
   CheckCircle,
   Clock,
   FileText,
-  Loader2,
   Pencil,
   RotateCcw,
   Send,
@@ -27,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getReport,
@@ -113,11 +113,7 @@ export default function ReportDetailPage({
   }
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   if (error || !report) {
