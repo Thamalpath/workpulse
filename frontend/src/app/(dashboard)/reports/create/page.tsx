@@ -309,7 +309,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
         {/* Basic Info */}
         <div className="rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
           <SectionHeader title="Report Details" />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-1.5">
               <Label>Week Start Date</Label>
               <Input type="date" value={weekStart} onChange={(e) => setWeekStart(e.target.value)} required />
