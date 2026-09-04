@@ -1,31 +1,59 @@
 "use client";
 
 import * as React from "react";
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
 import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 function Checkbox({
   className,
-  ...props
-}: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  disabled,
+  id,
+  name,
+  required,
+}: {
+  className?: string;
+  checked?: boolean;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  id?: string;
+  name?: string;
+  required?: boolean;
+}) {
   return (
-    <CheckboxPrimitive.Root
-      data-slot="checkbox"
+    <span
       className={cn(
-        "peer border-input dark:bg-input/30 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground dark:data-[state=checked]:bg-primary data-[state=checked]:border-primary focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/40 aria-invalid:border-destructive size-4 shrink-0 rounded-lg border shadow-sm transition-colors outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex size-4 shrink-0 items-center justify-center rounded border shadow-sm transition-colors",
+        "border-input bg-background",
+        "focus-within:border-ring focus-within:ring-ring/50 focus-within:outline-none focus-within:ring-[3px]",
+        "aria-invalid:border-destructive aria-invalid:ring-destructive/40",
+        checked && "border-primary bg-primary text-primary-foreground",
+        disabled && "cursor-not-allowed opacity-50",
         className,
       )}
-      {...props}
     >
-      <CheckboxPrimitive.Indicator
-        data-slot="checkbox-indicator"
-        className="flex items-center justify-center text-current transition-none"
-      >
-        <Check className="size-3" />
-      </CheckboxPrimitive.Indicator>
-    </CheckboxPrimitive.Root>
+      <input
+        type="checkbox"
+        className="absolute inset-0 size-full cursor-pointer appearance-none"
+        checked={checked}
+        defaultChecked={defaultChecked}
+        onChange={(e) => onCheckedChange?.(e.target.checked)}
+        disabled={disabled}
+        id={id}
+        name={name}
+        required={required}
+      />
+      <Check
+        className={cn(
+          "pointer-events-none absolute size-3 text-current transition-opacity",
+          checked ? "opacity-100" : "opacity-0",
+        )}
+      />
+    </span>
   );
 }
 
