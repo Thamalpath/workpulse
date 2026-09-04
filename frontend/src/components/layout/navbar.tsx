@@ -40,7 +40,7 @@ function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
-      <div className="flex size-9 items-center justify-center rounded-full bg-[#38B8C4]/20 font-semibold text-[#0E7C86]">
+      <div className="flex size-9 items-center justify-center rounded-full bg-[#4263A3]/20 font-semibold text-[#4263A3]">
         {user?.name?.charAt(0) ?? "U"}
       </div>
       <div className="hidden min-w-0 sm:block">

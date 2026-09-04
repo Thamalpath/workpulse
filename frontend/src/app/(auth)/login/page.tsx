@@ -70,7 +70,7 @@ export default function LoginPage() {
           className="pointer-events-none absolute inset-0 lg:hidden"
         >
           <div className="absolute -top-32 -left-24 h-72 w-72 rounded-full bg-[#4263A3]/15 blur-3xl" />
-          <div className="absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-[#38B8C4]/15 blur-3xl" />
+          <div className="absolute -right-24 -bottom-24 h-72 w-72 rounded-full bg-[#4263A3]/15 blur-3xl" />
         </div>
 
         <div className="relative z-10 flex w-full max-w-sm flex-col">

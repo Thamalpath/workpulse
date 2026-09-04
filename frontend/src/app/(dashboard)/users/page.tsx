@@ -87,7 +87,7 @@ function PermissionsView({
           <ul className="mt-3 space-y-2">
             {list.map((permission) => (
               <li key={permission.id} className="flex items-start gap-2.5">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#38B8C4]" />
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#4263A3]" />
                 <div>
                   <p className="text-sm font-medium text-[#18202F]">
                     {permission.name}

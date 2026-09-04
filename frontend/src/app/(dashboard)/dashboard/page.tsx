@@ -28,7 +28,7 @@ const recentReports = [
 const statusColor: Record<string, string> = {
   Approved: "bg-[#3C8C7A]/10 text-[#3C8C7A]",
   "Pending review": "bg-[#D69B3D]/10 text-[#D69B3D]",
-  "In progress": "bg-[#38B8C4]/10 text-[#0E7C86]",
+  "In progress": "bg-[#4263A3]/10 text-[#4263A3]",
   "Needs changes": "bg-[#C85C5C]/10 text-[#C85C5C]",
 };
 
