@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,11 +19,16 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { AUTH_CONFIG } from "@/config/auth";
 import { useAuth } from "@/contexts/auth-context";
 import { registerSchema, type RegisterInput } from "@/lib/validations/auth";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo =
+    searchParams.get("redirect") ||
+    AUTH_CONFIG.routes.defaultAuthenticatedRedirect;
   const { register, isAuthenticated, isLoading } = useAuth();
 
   const form = useForm<RegisterInput>({
@@ -41,20 +46,32 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.replace("/dashboard");
+      router.replace(redirectTo);
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, redirectTo, router]);
 
   if (isLoading) {
-    return null;
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center bg-[#F5F7FA]">
+        <div className="flex flex-col items-center gap-4 text-muted-foreground animate-pulse">
+          <Loader2 className="size-8 animate-spin text-[#4263A3]" />
+          <span className="text-sm font-medium">Verifying session…</span>
+        </div>
+      </div>
+    );
   }
 
   async function onSubmit(data: RegisterInput) {
-    const { confirmPassword: _, ...payload } = data;
+    const payload = {
+      name: data.name,
+      email: data.email,
+      username: data.username,
+      password: data.password,
+    };
     try {
       await register(payload);
       toast.success("Account created successfully! Welcome to WorkPulse.");
-      router.replace("/dashboard");
+      router.replace(redirectTo);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Unable to create your account.",
@@ -227,5 +244,22 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen w-full items-center justify-center bg-[#F5F7FA]">
+          <div className="flex flex-col items-center gap-4 text-muted-foreground animate-pulse">
+            <Loader2 className="size-8 animate-spin text-[#4263A3]" />
+            <span className="text-sm font-medium">Loading…</span>
+          </div>
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }
