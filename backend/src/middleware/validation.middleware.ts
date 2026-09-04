@@ -8,6 +8,7 @@ type Rule =
   | { isEmail?: boolean; message?: string }
   | { isString?: boolean; message?: string }
   | { isArray?: boolean; message?: string }
+  | { isStringArray?: boolean; message?: string }
   | { min?: number; message?: string };
 
 type Rules = Record<string, Rule | Rule[]>;
@@ -28,7 +29,10 @@ function applyRule(field: string, value: any, rule: Rule) {
   if ("isArray" in rule && rule.isArray && !Array.isArray(value)) {
     throw new ApiError(400, rule.message ?? `${field} must be an array.`);
   }
-  if ("isArray" in rule && rule.isArray && Array.isArray(value)) {
+  if ("isStringArray" in rule && rule.isStringArray) {
+    if (!Array.isArray(value)) {
+      throw new ApiError(400, rule.message ?? `${field} must be an array.`);
+    }
     const items = value as unknown[];
     if (!items.every((item) => typeof item === "string")) {
       throw new ApiError(400, rule.message ?? `${field} must contain only strings.`);

@@ -67,6 +67,29 @@ function toId(value: string | number): string {
   return String(value);
 }
 
+function toDateString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  const date = value as Date;
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function toDateParam(value: string): string {
+  return value.slice(0, 10);
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function toNullableNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export type CreateReportInput = {
   projectId?: string;
   weekStartDate: string;
@@ -125,8 +148,8 @@ function mapReport(row: ReportRow) {
     id: toId(row.id),
     userId: toId(row.userId),
     projectId: row.projectId != null ? toId(row.projectId) : null,
-    weekStartDate: row.weekStartDate,
-    weekEndDate: row.weekEndDate,
+    weekStartDate: toDateString(row.weekStartDate),
+    weekEndDate: toDateString(row.weekEndDate),
     status: row.status,
     notes: row.notes,
     userName: row.userName,
@@ -224,7 +247,18 @@ async function replaceNested(exec: TransactionExec, reportId: string | number, d
     await exec.run(
       `INSERT INTO ReportTask (reportId, taskName, priority, plannedPercent, actualPercent, status, timePlanned, timeSpent, deliverable, sortOrder)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [reportId, t.taskName, t.priority, t.plannedPercent, t.actualPercent, t.status, t.timePlanned ?? null, t.timeSpent ?? null, t.deliverable ?? null, i]
+      [
+        reportId,
+        t.taskName,
+        t.priority,
+        toNumber(t.plannedPercent, 0),
+        toNumber(t.actualPercent, 0),
+        t.status,
+        toNullableNumber(t.timePlanned),
+        toNullableNumber(t.timeSpent),
+        t.deliverable ?? null,
+        i,
+      ]
     );
   }
 
@@ -254,7 +288,7 @@ async function replaceNested(exec: TransactionExec, reportId: string | number, d
   for (const h of data.hoursWorked) {
     await exec.run(
       `INSERT INTO ReportHoursWorked (reportId, category, hours) VALUES (?, ?, ?)`,
-      [reportId, h.category, h.hours]
+      [reportId, h.category, toNumber(h.hours, 0)]
     );
   }
 }
@@ -317,7 +351,7 @@ export async function createReport(userId: string, data: CreateReportInput) {
       const insertId = await exec.insertId(
         `INSERT INTO WeeklyReport (userId, projectId, weekStartDate, weekEndDate, notes)
          VALUES (?, ?, ?, ?, ?)`,
-        [userId, data.projectId ?? null, data.weekStartDate, data.weekEndDate, data.notes ?? null]
+        [userId, data.projectId ?? null, toDateParam(data.weekStartDate), toDateParam(data.weekEndDate), data.notes ?? null]
       );
       await replaceNested(exec, insertId, data);
       return insertId;
@@ -346,7 +380,7 @@ export async function updateReport(id: string, userId: string, data: UpdateRepor
   await withTransaction(async (exec) => {
     await exec.run(
       `UPDATE WeeklyReport SET projectId = ?, weekStartDate = ?, weekEndDate = ?, notes = ?, updatedAt = NOW() WHERE id = ?`,
-      [data.projectId ?? null, data.weekStartDate, data.weekEndDate, data.notes ?? null, id]
+      [data.projectId ?? null, toDateParam(data.weekStartDate), toDateParam(data.weekEndDate), data.notes ?? null, id]
     );
     await replaceNested(exec, id, data);
   });
