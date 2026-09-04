@@ -6,8 +6,6 @@ type UserRow = {
   email: string;
   username: string;
   name: string;
-  position: string | null;
-  avatarUrl: string | null;
   isActive: boolean;
   createdAt: Date;
 };
@@ -29,8 +27,6 @@ function mapUser(row: UserRow, roles: RoleShape[]) {
     email: row.email,
     username: row.username,
     name: row.name,
-    position: row.position,
-    avatarUrl: row.avatarUrl,
     isActive: toBoolean(row.isActive),
     createdAt: row.createdAt,
     roles,
@@ -68,7 +64,7 @@ async function getRolesForUser(userId: string | number): Promise<RoleShape[]> {
 
 async function fetchUserWithRoles(id: string) {
   const rows = (await query(
-    `SELECT id, email, username, name, position, avatarUrl, isActive, createdAt
+    `SELECT id, email, username, name, isActive, createdAt
      FROM User WHERE id = ? LIMIT 1`,
     [id]
   )) as UserRow[];
@@ -82,7 +78,7 @@ async function fetchUserWithRoles(id: string) {
 
 export async function listUsers() {
   const rows = (await query(
-    `SELECT id, email, username, name, position, avatarUrl, isActive, createdAt
+    `SELECT id, email, username, name, isActive, createdAt
      FROM User ORDER BY createdAt DESC`
   )) as UserRow[];
 
@@ -107,7 +103,6 @@ export async function createUser(data: {
   email: string;
   username: string;
   password: string;
-  position?: string;
   roleIds: string[];
 }) {
   const email = data.email.toLowerCase();
@@ -127,9 +122,9 @@ export async function createUser(data: {
   const id = String(
     await withTransaction(async (exec) => {
       const insertId = await exec.insertId(
-        `INSERT INTO User (email, username, password, name, position, isActive)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [email, username, hashedPassword, data.name, data.position ?? null, true]
+        `INSERT INTO User (email, username, password, name, isActive)
+         VALUES (?, ?, ?, ?, ?)`,
+        [email, username, hashedPassword, data.name, true]
       );
 
       for (const roleId of data.roleIds) {
@@ -147,8 +142,6 @@ export async function createUser(data: {
       email,
       username,
       name: data.name,
-      position: data.position ?? null,
-      avatarUrl: null,
       isActive: true,
       createdAt: new Date(),
     },
@@ -160,7 +153,6 @@ export async function updateUser(
   id: string,
   data: {
     name?: string;
-    position?: string;
     isActive?: boolean;
     roleIds?: string[];
     password?: string;
@@ -175,12 +167,6 @@ export async function updateUser(
 
   if (data.name !== undefined) {
     await query(`UPDATE User SET name = ?, updatedAt = NOW() WHERE id = ?`, [data.name, id]);
-  }
-  if (data.position !== undefined) {
-    await query(`UPDATE User SET position = ?, updatedAt = NOW() WHERE id = ?`, [
-      data.position,
-      id,
-    ]);
   }
   if (data.isActive !== undefined) {
     await query(`UPDATE User SET isActive = ?, updatedAt = NOW() WHERE id = ?`, [

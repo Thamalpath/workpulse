@@ -10,8 +10,6 @@ export type AuthUser = {
   email: string;
   username: string;
   name: string;
-  position: string | null;
-  avatarUrl: string | null;
   isActive: boolean;
 };
 
@@ -40,8 +38,6 @@ type UserRow = {
   username: string;
   password: string;
   name: string;
-  position: string | null;
-  avatarUrl: string | null;
   isActive: boolean;
 };
 
@@ -83,8 +79,6 @@ function toUserShape(row: UserRow, roles: UserWithRoles["roles"]): UserWithRoles
     username: row.username,
     password: row.password,
     name: row.name,
-    position: row.position,
-    avatarUrl: row.avatarUrl,
     isActive: row.isActive,
     roles,
   };
@@ -118,7 +112,6 @@ export async function registerUser(data: {
   email: string;
   username: string;
   password: string;
-  position?: string;
 }) {
   const email = data.email.toLowerCase();
   const username = data.username.toLowerCase();
@@ -141,9 +134,9 @@ export async function registerUser(data: {
   const hashedPassword = await bcrypt.hash(data.password, 10);
   const userId = await withTransaction(async (exec) => {
     const insertId = await exec.insertId(
-      `INSERT INTO User (email, username, password, name, position, isActive)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [email, username, hashedPassword, data.name, data.position ?? null, true]
+      `INSERT INTO User (email, username, password, name, isActive)
+       VALUES (?, ?, ?, ?, ?)`,
+      [email, username, hashedPassword, data.name, true]
     );
 
     for (const role of roleRows) {
@@ -179,8 +172,6 @@ export async function registerUser(data: {
       email,
       username,
       name: data.name,
-      position: data.position ?? null,
-      avatarUrl: null,
       isActive: true,
     },
     roles,
@@ -219,8 +210,6 @@ export async function buildMePayload(userId: string) {
       email: user.email,
       username: user.username,
       name: user.name,
-      position: user.position,
-      avatarUrl: user.avatarUrl,
       isActive: user.isActive,
     },
     roles: user.roles.map(({ role }) => ({
