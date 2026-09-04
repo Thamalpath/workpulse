@@ -7,7 +7,6 @@ import {
   ArrowRight,
   CheckCircle,
   FileText,
-  Loader2,
   Pencil,
   Plus,
   RotateCcw,
@@ -26,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
 import {
   getMyReports,
@@ -113,11 +113,7 @@ export default function ReportsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   const isManager = canViewAll && (permissions.includes("report.approve") || permissions.includes("role.view"));
@@ -273,9 +269,8 @@ export default function ReportsPage() {
                         )}
                         {canDeleteOwn && (
                           <Button
-                            variant="ghost"
+                            variant="ghostDestructive"
                             size="icon"
-                            className="text-[#C85C5C]"
                             onClick={() => handleDelete(report.id)}
                             aria-label="Delete report"
                           >

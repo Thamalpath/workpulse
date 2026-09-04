@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
 import { ApiError } from "@/lib/api";
 import {
@@ -498,11 +499,7 @@ export default function UsersPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   if (!canViewUsers && !canViewRoles) {
@@ -613,9 +610,8 @@ export default function UsersPage() {
                             </Button>
                             {canDeleteUsers && (
                               <Button
-                                variant="ghost"
+                                variant="ghostDestructive"
                                 size="icon"
-                                className="text-[#C85C5C]"
                                 onClick={() => handleDeleteUser(user)}
                                 aria-label={`Delete ${user.name}`}
                               >
@@ -709,9 +705,8 @@ export default function UsersPage() {
                             )}
                             {canDeleteRoles && !role.isSystem && (
                               <Button
-                                variant="ghost"
+                                variant="ghostDestructive"
                                 size="icon"
-                                className="text-[#C85C5C]"
                                 onClick={() => handleDeleteRole(role)}
                                 aria-label={`Delete ${role.name}`}
                               >

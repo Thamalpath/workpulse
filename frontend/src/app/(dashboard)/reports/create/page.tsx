@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FullPageLoader } from "@/components/loader";
 import {
   Select,
   SelectContent,
@@ -109,9 +110,9 @@ function TaskRow({
         />
         <Button
           type="button"
-          variant="ghost"
+          variant="ghostDestructive"
           size="icon"
-          className="text-[#C85C5C] shrink-0"
+          className="shrink-0"
           onClick={() => onRemove(index)}
         >
           <Trash2 className="size-4" />
@@ -279,15 +280,11 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
   }
 
   if (loading) {
-    return (
-      <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="size-8 animate-spin text-[#4263A3]" />
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 xl:max-w-6xl 2xl:max-w-[1400px]">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Link
@@ -366,11 +363,11 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           </div>
           <div className="space-y-3">
             {nextWeekTasks.map((task, i) => (
-              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex items-center gap-3">
+              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Input placeholder="Task name" value={task.taskName} className="flex-1"
                   onChange={(e) => updateNextWeekTask(i, { ...task, taskName: e.target.value })} />
                 <Select value={task.priority} onValueChange={(v) => updateNextWeekTask(i, { ...task, priority: v as NextWeekTask["priority"] })}>
-                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-28"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PRIORITY_OPTIONS.map((p) => (
                       <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>
@@ -378,14 +375,14 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
                   </SelectContent>
                 </Select>
                 <Select value={task.status} onValueChange={(v) => updateNextWeekTask(i, { ...task, status: v as NextWeekTask["status"] })}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {NEXT_TASK_STATUS_OPTIONS.map((s) => (
                       <SelectItem key={s} value={s}>{s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
+                <Button type="button" variant="ghostDestructive" size="icon" className="shrink-0 self-end sm:self-auto"
                   onClick={() => setNextWeekTasks((prev) => prev.filter((_, j) => j !== i))}>
                   <Trash2 className="size-4" />
                 </Button>
@@ -404,22 +401,24 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           </div>
           <div className="space-y-3">
             {blockers.map((blocker, i) => (
-              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex items-start gap-3">
+              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex flex-col gap-3 sm:flex-row sm:items-start">
                 <Textarea placeholder="Describe the blocker..." value={blocker.description} className="flex-1 min-h-0"
                   onChange={(e) => updateBlocker(i, { ...blocker, description: e.target.value })} />
-                <label className="flex items-center gap-2 text-sm whitespace-nowrap pt-2">
-                  <Checkbox
-                    checked={blocker.isKeyIssue}
-                    onCheckedChange={(checked) =>
-                      updateBlocker(i, { ...blocker, isKeyIssue: checked })
-                    }
-                  />
-                  Key issue
-                </label>
-                <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
-                  onClick={() => setBlockers((prev) => prev.filter((_, j) => j !== i))}>
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex items-center justify-between gap-3 sm:justify-start sm:pt-2">
+                  <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                    <Checkbox
+                      checked={blocker.isKeyIssue}
+                      onCheckedChange={(checked) =>
+                        updateBlocker(i, { ...blocker, isKeyIssue: checked })
+                      }
+                    />
+                    Key issue
+                  </label>
+                  <Button type="button" variant="ghostDestructive" size="icon" className="shrink-0"
+                    onClick={() => setBlockers((prev) => prev.filter((_, j) => j !== i))}>
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -435,22 +434,24 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           </div>
           <div className="space-y-3">
             {achievements.map((achievement, i) => (
-              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex items-start gap-3">
+              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex flex-col gap-3 sm:flex-row sm:items-start">
                 <Textarea placeholder="Describe the achievement..." value={achievement.description} className="flex-1 min-h-0"
                   onChange={(e) => updateAchievement(i, { ...achievement, description: e.target.value })} />
-                <label className="flex items-center gap-2 text-sm whitespace-nowrap pt-2">
-                  <Checkbox
-                    checked={achievement.isKeyAchievement}
-                    onCheckedChange={(checked) =>
-                      updateAchievement(i, { ...achievement, isKeyAchievement: checked })
-                    }
-                  />
-                  Key
-                </label>
-                <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
-                  onClick={() => setAchievements((prev) => prev.filter((_, j) => j !== i))}>
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex items-center justify-between gap-3 sm:justify-start sm:pt-2">
+                  <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+                    <Checkbox
+                      checked={achievement.isKeyAchievement}
+                      onCheckedChange={(checked) =>
+                        updateAchievement(i, { ...achievement, isKeyAchievement: checked })
+                      }
+                    />
+                    Key
+                  </label>
+                  <Button type="button" variant="ghostDestructive" size="icon" className="shrink-0"
+                    onClick={() => setAchievements((prev) => prev.filter((_, j) => j !== i))}>
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -466,9 +467,9 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           </div>
           <div className="space-y-3">
             {hoursWorked.map((h, i) => (
-              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex items-center gap-3">
+              <div key={i} className="rounded-lg border border-[#E1E6ED] p-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Select value={h.category} onValueChange={(v) => updateHours(i, { ...h, category: v })}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder="Category" /></SelectTrigger>
+                  <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
                   <SelectContent>
                     {HOURS_CATEGORIES.map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -476,8 +477,8 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
                   </SelectContent>
                 </Select>
                 <Input type="number" min={0} step={0.5} placeholder="Hours" value={h.hours || ""}
-                  onChange={(e) => updateHours(i, { ...h, hours: Number(e.target.value) })} className="w-28" />
-                <Button type="button" variant="ghost" size="icon" className="text-[#C85C5C] shrink-0"
+                  onChange={(e) => updateHours(i, { ...h, hours: Number(e.target.value) })} className="w-full sm:w-28" />
+                <Button type="button" variant="ghostDestructive" size="icon" className="shrink-0 self-end sm:self-auto"
                   onClick={() => setHoursWorked((prev) => prev.filter((_, j) => j !== i))}>
                   <Trash2 className="size-4" />
                 </Button>
