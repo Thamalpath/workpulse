@@ -20,11 +20,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  getProjects,
   getReport,
   createReport,
   updateReport,
-  type Project,
   type CreateReportInput,
   type ReportTask,
   type NextWeekTask,
@@ -32,6 +30,7 @@ import {
   type Achievement,
   type HoursWorked,
 } from "@/services/report.service";
+import { getProjects, type Project } from "@/services/project.service";
 
 function getCurrentWeekDates() {
   const now = new Date();

@@ -105,14 +105,6 @@ export type CreateReportInput = {
   hoursWorked: HoursWorked[];
 };
 
-export type Project = {
-  id: string;
-  name: string;
-  key: string;
-  description: string | null;
-  isActive: boolean;
-};
-
 export function getMyReports() {
   return api.get<Report[]>("/api/reports/my");
 }
@@ -154,14 +146,6 @@ export function getReportVersions(id: string) {
 
 export function getReportVersion(reportId: string, versionId: string) {
   return api.get<ReportVersionDetail>(`/api/reports/${reportId}/versions/${versionId}`);
-}
-
-export function getProjects() {
-  return api.get<Project[]>("/api/reports/projects");
-}
-
-export function createProject(data: { name: string; key: string; description?: string }) {
-  return api.post<Project>("/api/reports/projects", data);
 }
 
 export const STATUS_LABELS: Record<ReportStatus, string> = {

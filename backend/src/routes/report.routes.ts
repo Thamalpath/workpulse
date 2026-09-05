@@ -8,17 +8,14 @@ import {
   patchReport,
   removeReport,
   submitReport,
-  getProjects,
-  postProject,
-  removeProject,
 } from "../controllers/report.controller.js";
 import { reviewReport } from "../controllers/review.controller.js";
 import {
   getVersionDetail,
   getVersions,
 } from "../controllers/reportVersion.controller.js";
-import { authenticate, requirePermission, requireRole } from "../middleware/auth.middleware.js";
-import { validateCreateReport, validateCreateProject } from "../validators/report.validator.js";
+import { authenticate, requirePermission } from "../middleware/auth.middleware.js";
+import { validateCreateReport } from "../validators/report.validator.js";
 import { validateReview } from "../validators/review.validator.js";
 import { PERMISSIONS } from "../constants/permissions.js";
 
@@ -28,9 +25,6 @@ router.use(authenticate(true));
 
 router.get("/my", getMyReports);
 router.get("/", requirePermission(PERMISSIONS.REPORT_VIEW_ALL), getAllReports);
-router.get("/projects", getProjects);
-router.post("/projects", requireRole("admin", "manager"), validateCreateProject, postProject);
-router.delete("/projects/:id", requireRole("admin", "manager"), removeProject);
 
 router.get("/:id", getReport);
 router.post("/", requirePermission(PERMISSIONS.REPORT_CREATE), validateCreateReport, postReport);

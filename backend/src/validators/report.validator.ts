@@ -9,8 +9,3 @@ export const validateCreateReport = validateBody({
   achievements: [{ isArray: true, message: "Achievements must be an array." }],
   hoursWorked: [{ isArray: true, message: "Hours worked must be an array." }],
 });
-
-export const validateCreateProject = validateBody({
-  name: [{ required: true, message: "Project name is required." }, { isString: true }],
-  key: [{ required: true, message: "Project key is required." }, { isString: true }],
-});

@@ -9,9 +9,6 @@ import {
   deleteReport,
   transitionStatus,
   assertCanReadReport,
-  listProjects,
-  createProject,
-  deleteProject,
 } from "../services/report.service.js";
 
 export async function getMyReports(req: Request, res: Response) {
@@ -58,21 +55,4 @@ export async function submitReport(req: Request, res: Response) {
   const userId = (req as AuthedRequest).userId!;
   const data = await transitionStatus(id, userId, "submitted");
   res.json({ success: true, data });
-}
-
-export async function getProjects(_req: Request, res: Response) {
-  const data = await listProjects();
-  res.json({ success: true, data });
-}
-
-export async function postProject(req: Request, res: Response) {
-  const { name, key, description } = req.body as { name: string; key: string; description?: string };
-  const data = await createProject({ name, key, ...(description !== undefined ? { description } : {}) });
-  res.status(201).json({ success: true, data });
-}
-
-export async function removeProject(req: Request, res: Response) {
-  const id = req.params.id as string;
-  await deleteProject(id);
-  res.json({ success: true, message: "Project archived." });
 }

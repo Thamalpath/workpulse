@@ -1,4 +1,4 @@
-import { query, insert, withTransaction, type RowDataPacket, type TransactionExec } from "../config/database.js";
+import { query, withTransaction, type RowDataPacket, type TransactionExec } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
 import { PERMISSIONS } from "../constants/permissions.js";
 import { listReportVersions } from "./reportVersion.service.js";
@@ -552,39 +552,4 @@ export async function transitionStatus(id: string, userId: string, newStatus: st
   });
 
   return getReportById(id);
-}
-
-export async function listProjects() {
-  const rows = (await query(
-    `SELECT id, name, \`key\`, description, isActive FROM Project WHERE isActive = 1 ORDER BY name ASC`
-  )) as { id: string | number; name: string; key: string; description: string | null; isActive: boolean | number }[];
-  return rows.map((r) => ({
-    id: toId(r.id),
-    name: r.name,
-    key: r.key,
-    description: r.description,
-    isActive: toBoolean(r.isActive),
-  }));
-}
-
-export async function createProject(data: { name: string; key: string; description?: string }) {
-  const existing = (await query(`SELECT id FROM Project WHERE \`key\` = ? LIMIT 1`, [data.key])) as { id: string | number }[];
-  if (existing.length > 0) {
-    throw new ApiError(409, "A project with this key already exists.");
-  }
-  const id = String(
-    await insert(
-      `INSERT INTO Project (name, \`key\`, description) VALUES (?, ?, ?)`,
-      [data.name, data.key, data.description ?? null]
-    )
-  );
-  return { id, name: data.name, key: data.key, description: data.description ?? null, isActive: true };
-}
-
-export async function deleteProject(id: string) {
-  const existing = (await query(`SELECT id FROM Project WHERE id = ? LIMIT 1`, [id])) as { id: string | number }[];
-  if (existing.length === 0) {
-    throw new ApiError(404, "Project not found.");
-  }
-  await query(`UPDATE Project SET isActive = 0, updatedAt = NOW() WHERE id = ?`, [id]);
 }
