@@ -61,7 +61,6 @@ export type MemberStatusPoint = {
 export type ProjectWorkloadPoint = {
   projectId: string | null;
   projectName: string;
-  projectKey: string;
   taskCount: number;
   completedTasks: number;
   totalHours: number;
@@ -378,7 +377,6 @@ async function fetchProjectWorkload(
     `SELECT
        p.id as projectId,
        COALESCE(p.name, 'General / No Project') as projectName,
-       COALESCE(p.\`key\`, 'N/A') as projectKey,
        COUNT(DISTINCT wr.id) as reportCount,
        COUNT(rt.id) as taskCount,
        SUM(CASE WHEN rt.status = 'completed' THEN 1 ELSE 0 END) as completedTasks,
@@ -393,7 +391,7 @@ async function fetchProjectWorkload(
      LEFT JOIN Project p ON p.id = wr.projectId
      LEFT JOIN ReportTask rt ON rt.reportId = wr.id
      WHERE ${where.join(" AND ")}
-     GROUP BY p.id, p.name, p.\`key\`
+     GROUP BY p.id, p.name
      ORDER BY totalHours DESC, taskCount DESC`,
     [...params, ...params],
   )) as Record<string, unknown>[];
@@ -401,7 +399,6 @@ async function fetchProjectWorkload(
   return rows.map((r) => ({
     projectId: r.projectId != null ? toId(r.projectId as string | number) : null,
     projectName: String(r.projectName),
-    projectKey: String(r.projectKey),
     reportCount: Number(r.reportCount ?? 0),
     taskCount: Number(r.taskCount ?? 0),
     completedTasks: Number(r.completedTasks ?? 0),

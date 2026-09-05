@@ -6,6 +6,7 @@ import {
   postProject,
   patchProject,
   removeProject,
+  removeProjectPermanently,
   putProjectMembers,
 } from "../controllers/project.controller.js";
 import { authenticate, requirePermission } from "../middleware/auth.middleware.js";
@@ -26,6 +27,7 @@ router.get("/:id", requirePermission(PERMISSIONS.PROJECT_VIEW), getProject);
 router.post("/", requirePermission(PERMISSIONS.PROJECT_MANAGE), validateCreateProject, postProject);
 router.patch("/:id", requirePermission(PERMISSIONS.PROJECT_MANAGE), validateUpdateProject, patchProject);
 router.delete("/:id", requirePermission(PERMISSIONS.PROJECT_MANAGE), removeProject);
+router.delete("/:id/permanent", requirePermission(PERMISSIONS.PROJECT_MANAGE), removeProjectPermanently);
 router.put("/:id/members", requirePermission(PERMISSIONS.PROJECT_MANAGE), validateMembers, putProjectMembers);
 
 export default router;

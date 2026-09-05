@@ -4,7 +4,6 @@ import { ApiError } from "../utils/api-error.js";
 type ProjectRow = {
   id: string | number;
   name: string;
-  key: string;
   description: string | null;
   isActive: boolean | number;
   createdAt: Date;
@@ -35,7 +34,6 @@ function mapProject(row: ProjectRow) {
   return {
     id: toId(row.id),
     name: row.name,
-    key: row.key,
     description: row.description,
     isActive: toBoolean(row.isActive),
     createdAt: row.createdAt,
@@ -56,7 +54,6 @@ function mapMember(row: MemberRow) {
 const PROJECT_COLUMNS = `
   p.id,
   p.name,
-  p.\`key\`,
   p.description,
   p.isActive,
   p.createdAt,
@@ -107,21 +104,12 @@ export async function getProjectById(id: string) {
 
 export async function createProject(data: {
   name: string;
-  key: string;
   description?: string;
 }) {
-  const existing = (await query(
-    `SELECT id FROM Project WHERE \`key\` = ? LIMIT 1`,
-    [data.key]
-  )) as { id: string | number }[];
-  if (existing.length > 0) {
-    throw new ApiError(409, "A project with this key already exists.");
-  }
-
   const id = toId(
     await insert(
-      `INSERT INTO Project (name, \`key\`, description) VALUES (?, ?, ?)`,
-      [data.name, data.key, data.description ?? null]
+      `INSERT INTO Project (name, description) VALUES (?, ?)`,
+      [data.name, data.description ?? null]
     )
   );
   return getProjectById(id);
@@ -131,7 +119,6 @@ export async function updateProject(
   id: string,
   data: {
     name?: string;
-    key?: string;
     description?: string;
     isActive?: boolean;
   }
@@ -141,22 +128,8 @@ export async function updateProject(
     throw new ApiError(404, "Project not found.");
   }
 
-  if (data.key !== undefined) {
-    const conflict = (await query(
-      `SELECT id FROM Project
-       WHERE \`key\` = ? AND id <> ? LIMIT 1`,
-      [data.key, id]
-    )) as { id: string | number }[];
-    if (conflict.length > 0) {
-      throw new ApiError(409, "A project with this key already exists.");
-    }
-  }
-
   if (data.name !== undefined) {
     await query(`UPDATE Project SET name = ?, updatedAt = NOW() WHERE id = ?`, [data.name, id]);
-  }
-  if (data.key !== undefined) {
-    await query(`UPDATE Project SET \`key\` = ?, updatedAt = NOW() WHERE id = ?`, [data.key, id]);
   }
   if (data.description !== undefined) {
     await query(`UPDATE Project SET description = ?, updatedAt = NOW() WHERE id = ?`, [
@@ -180,6 +153,20 @@ export async function archiveProject(id: string) {
     throw new ApiError(404, "Project not found.");
   }
   await query(`UPDATE Project SET isActive = 0, updatedAt = NOW() WHERE id = ?`, [id]);
+}
+
+export async function deleteProjectPermanently(id: string) {
+  const existing = await loadProject(id);
+  if (!existing) {
+    throw new ApiError(404, "Project not found.");
+  }
+  if (toCount(existing.reportCount) > 0) {
+    throw new ApiError(
+      409,
+      "This project has reports referencing it and cannot be permanently deleted. Archive it instead.",
+    );
+  }
+  await query(`DELETE FROM Project WHERE id = ?`, [id]);
 }
 
 export async function setProjectMembers(id: string, userIds: string[]) {

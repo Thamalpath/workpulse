@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import {
   archiveProject,
   createProject,
+  deleteProjectPermanently,
   getProjectById,
   listProjects,
   setProjectMembers,
@@ -20,14 +21,12 @@ export async function getProject(req: Request, res: Response) {
 }
 
 export async function postProject(req: Request, res: Response) {
-  const { name, key, description } = req.body as {
+  const { name, description } = req.body as {
     name: string;
-    key: string;
     description?: string;
   };
   const data = await createProject({
     name,
-    key,
     ...(description !== undefined ? { description } : {}),
   });
   res.status(201).json({ success: true, data });
@@ -37,7 +36,6 @@ export async function patchProject(req: Request, res: Response) {
   const id = req.params.id as string;
   const body = req.body as {
     name?: string;
-    key?: string;
     description?: string;
     isActive?: boolean;
   };
@@ -48,6 +46,11 @@ export async function patchProject(req: Request, res: Response) {
 export async function removeProject(req: Request, res: Response) {
   await archiveProject(req.params.id as string);
   res.json({ success: true, message: "Project archived." });
+}
+
+export async function removeProjectPermanently(req: Request, res: Response) {
+  await deleteProjectPermanently(req.params.id as string);
+  res.json({ success: true, message: "Project deleted." });
 }
 
 export async function putProjectMembers(req: Request, res: Response) {
