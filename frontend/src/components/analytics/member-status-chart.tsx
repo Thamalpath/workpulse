@@ -91,7 +91,7 @@ export function MemberStatusChart({
                 fontSize: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
-              formatter={(value: number, name: string) => [`${value} report(s)`, name]}
+              formatter={(value, name) => [`${Number(value ?? 0)} report(s)`, name]}
               labelFormatter={(label) => `Member: ${label}`}
             />
             <Legend

@@ -4,6 +4,7 @@ const API_PROXY_TARGET =
   process.env.API_PROXY_TARGET ?? "http://localhost:5000";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async rewrites() {
     return [
       {
