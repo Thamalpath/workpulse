@@ -105,12 +105,114 @@ export type CreateReportInput = {
   hoursWorked: HoursWorked[];
 };
 
+export type ReportListFilters = {
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+  from?: string;
+  to?: string;
+  status?: ReportStatus;
+};
+
+export type TeamMemberStatus = ReportStatus | "not_started";
+
+export type TeamSummary = {
+  total: number;
+  submitted: number;
+  needs_correction: number;
+  approved: number;
+  draft: number;
+  not_started: number;
+  completionRate: number;
+};
+
+export type TeamRosterMember = {
+  id: string;
+  name: string;
+  email: string;
+  status: TeamMemberStatus;
+  reports: Report[];
+};
+
+export type TeamWeeklyResponse = {
+  weekStart: string;
+  weekEnd: string;
+  members: TeamRosterMember[];
+  summary: TeamSummary;
+};
+
+export type TeamSectionKey =
+  | "tasks"
+  | "next_week_tasks"
+  | "blockers"
+  | "achievements"
+  | "hours";
+
+export type TeamSectionGroup = {
+  reportId: string;
+  userId: string;
+  userName: string;
+  status: ReportStatus;
+  weekStartDate: string;
+  weekEndDate: string;
+  projectName: string | null;
+  items: unknown[];
+};
+
 export function getMyReports() {
   return api.get<Report[]>("/api/reports/my");
 }
 
-export function getAllReports() {
-  return api.get<Report[]>("/api/reports");
+export function getAllReports(filters: ReportListFilters = {}) {
+  return api.get<Report[]>(`/api/reports${buildQuery(filters)}`);
+}
+
+export function getTeamWeekly(filters: {
+  from?: string;
+  to?: string;
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+} = {}) {
+  return api.get<TeamWeeklyResponse>(`/api/reports/team${buildQuery(filters)}`);
+}
+
+export function getTeamSections(filters: {
+  from?: string;
+  to?: string;
+  section: TeamSectionKey;
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+}) {
+  return api.get<TeamSectionGroup[]>(
+    `/api/reports/team/sections${buildQuery(filters)}`
+  );
+}
+
+export const DEFAULT_HOURS_CATEGORIES = [
+  "Development",
+  "Design",
+  "Meetings",
+  "Research",
+  "Documentation",
+  "Testing",
+  "Other",
+] as const;
+
+export function getReportCategories() {
+  return api.get<string[]>("/api/reports/categories");
+}
+
+function buildQuery(values: Record<string, string | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, value);
+    }
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
 }
 
 export function getReport(id: string) {
@@ -160,4 +262,28 @@ export const STATUS_COLORS: Record<ReportStatus, string> = {
   submitted: "bg-blue-100 text-blue-700",
   needs_correction: "bg-yellow-100 text-yellow-700",
   approved: "bg-green-100 text-green-700",
+};
+
+export const TEAM_STATUS_LABELS: Record<TeamMemberStatus, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  needs_correction: "Needs Correction",
+  approved: "Approved",
+  not_started: "Not Started",
+};
+
+export const TEAM_STATUS_COLORS: Record<TeamMemberStatus, string> = {
+  draft: "bg-gray-100 text-gray-700",
+  submitted: "bg-blue-100 text-blue-700",
+  needs_correction: "bg-yellow-100 text-yellow-700",
+  approved: "bg-green-100 text-green-700",
+  not_started: "bg-gray-50 text-gray-400",
+};
+
+export const SECTION_LABELS: Record<TeamSectionKey, string> = {
+  tasks: "Tasks",
+  next_week_tasks: "Next Week",
+  blockers: "Blockers",
+  achievements: "Achievements",
+  hours: "Hours Worked",
 };
