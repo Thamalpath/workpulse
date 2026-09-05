@@ -27,6 +27,7 @@ export type Permission = {
   name: string;
   module: string;
   description: string | null;
+  isAdminLocked?: boolean;
 };
 
 export type CreateUserInput = {
@@ -91,4 +92,30 @@ export function deleteRole(id: string) {
 
 export function getPermissions() {
   return api.get<Permission[]>("/api/roles/permissions");
+}
+
+export type CreatePermissionInput = {
+  name: string;
+  key: string;
+  module: string;
+  description?: string;
+};
+
+export type UpdatePermissionInput = {
+  name?: string;
+  key?: string;
+  module?: string;
+  description?: string;
+};
+
+export function createPermission(data: CreatePermissionInput) {
+  return api.post<Permission>("/api/permissions", data);
+}
+
+export function updatePermission(id: string, data: UpdatePermissionInput) {
+  return api.patch<Permission>(`/api/permissions/${id}`, data);
+}
+
+export function deletePermission(id: string) {
+  return api.delete(`/api/permissions/${id}`);
 }

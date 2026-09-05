@@ -11,7 +11,8 @@ type Rule =
   | { isBoolean?: boolean; message?: string }
   | { isArray?: boolean; message?: string }
   | { isStringArray?: boolean; message?: string }
-  | { min?: number; message?: string };
+  | { min?: number; message?: string }
+  | { pattern?: RegExp; message?: string };
 
 type Rules = Record<string, Rule | Rule[]>;
 
@@ -58,6 +59,11 @@ function applyRule(field: string, value: any, rule: Rule) {
         400,
         rule.message ?? `${field} must be at least ${rule.minLength} characters.`
       );
+    }
+  }
+  if ("pattern" in rule && rule.pattern instanceof RegExp && typeof value === "string") {
+    if (!rule.pattern.test(value)) {
+      throw new ApiError(400, rule.message ?? `${field} has an invalid format.`);
     }
   }
 }

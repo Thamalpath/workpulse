@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, LayoutDashboard, LineChart, Users, X } from "lucide-react";
+import { BarChart3, FileText, KeyRound, LayoutDashboard, LineChart, ShieldCheck, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -16,6 +16,8 @@ export const navigationItems = [
   { label: "Projects", href: "/projects", icon: BarChart3 },
   { label: "Reports", href: "/reports", icon: FileText },
   { label: "Users", href: "/users", icon: Users, adminOnly: true },
+  { label: "Permissions", href: "/permissions", icon: ShieldCheck, adminOnly: true },
+  { label: "Role Permissions", href: "/role-permissions", icon: KeyRound, adminOnly: true },
 ];
 
 export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
@@ -24,7 +26,9 @@ export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
 
   const canViewInsights = permissions.includes("report.view.all");
   const canManageUsers =
-    permissions.includes("user.view") || permissions.includes("role.view");
+    permissions.includes("user.view") ||
+    permissions.includes("role.view") ||
+    permissions.includes("permission.view");
 
   const items = navigationItems.filter(
     (item) =>

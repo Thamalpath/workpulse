@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import roleRoutes from "./routes/role.routes.js";
+import permissionRoutes from "./routes/permission.routes.js";
 import reportRoutes from "./routes/report.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import analyticsRoutes from "./routes/analytics.routes.js";
@@ -32,6 +33,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/roles", roleRoutes);
+app.use("/api/permissions", permissionRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/analytics", analyticsRoutes);

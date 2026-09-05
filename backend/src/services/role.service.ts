@@ -145,6 +145,14 @@ export async function updateRole(
 
   const newName = data.name ?? role.name;
   const newDescription = data.description !== undefined ? data.description : role.description;
+
+  if (role.key === "admin" && data.permissionIds !== undefined) {
+    throw new ApiError(
+      400,
+      "The Admin role always has all permissions and they cannot be changed."
+    );
+  }
+
   await query(`UPDATE Role SET name = ?, description = ?, updatedAt = NOW() WHERE id = ?`, [
     newName,
     newDescription,
@@ -190,17 +198,4 @@ export async function deleteRole(id: string) {
     throw new ApiError(400, "Role is assigned to users and cannot be deleted.");
   }
   await query(`DELETE FROM Role WHERE id = ?`, [id]);
-}
-
-export async function listPermissions() {
-  const permissions = (await query(
-    `SELECT id, \`key\`, name, module, description FROM Permission ORDER BY module ASC, name ASC`
-  )) as PermissionRow[];
-  return permissions.map((p) => ({
-    id: String(p.id),
-    key: p.key,
-    name: p.name,
-    module: p.module,
-    description: p.description,
-  }));
 }

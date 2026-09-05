@@ -4,10 +4,10 @@ import {
   createRole,
   deleteRole,
   getRoleById,
-  listPermissions,
   listRoles,
   updateRole,
 } from "../services/role.service.js";
+import { listPermissions } from "../services/permission.service.js";
 
 export async function getRoles(_req: Request, res: Response) {
   const data = await listRoles();

@@ -1,8 +1,12 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
+  ListChecks,
   Loader2,
+  Mail,
   Pencil,
   Plus,
   ShieldCheck,
@@ -62,53 +66,9 @@ type RoleDialogState =
   | { mode: "edit"; role: ManagedRole }
   | null;
 
-function PermissionsView({
-  permissions,
-}: {
-  permissions: Permission[];
-}) {
-  const grouped = useMemo(() => {
-    const map = new Map<string, Permission[]>();
-    for (const permission of permissions) {
-      const list = map.get(permission.module) ?? [];
-      list.push(permission);
-      map.set(permission.module, list);
-    }
-    return Array.from(map.entries());
-  }, [permissions]);
-
-  return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {grouped.map(([module, list]) => (
-        <div
-          key={module}
-          className="rounded-xl border border-[#E1E6ED] bg-white p-5"
-        >
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3]">
-            {module.replace(".", " ")}
-          </h3>
-          <ul className="mt-3 space-y-2">
-            {list.map((permission) => (
-              <li key={permission.id} className="flex items-start gap-2.5">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#4263A3]" />
-                <div>
-                  <p className="text-sm font-medium text-[#18202F]">
-                    {permission.name}
-                  </p>
-                  {permission.description && (
-                    <p className="text-xs text-muted-foreground">
-                      {permission.description}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const ROLE_KEY_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 function UserDialog({
   state,
@@ -130,32 +90,104 @@ function UserDialog({
   const [selectedRoles, setSelectedRoles] = useState<string[]>(
     editing?.roles.map((role) => role.id) ?? []
   );
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    username?: string;
+    password?: string;
+    roles?: string;
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function clearError(field: keyof typeof errors) {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
+
   function toggleRole(roleId: string) {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId)
+    setSelectedRoles((prev) => {
+      const next = prev.includes(roleId)
         ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
-    );
+        : [...prev, roleId];
+      if (next.length > 0) clearError("roles");
+      return next;
+    });
+  }
+
+  function validateForm() {
+    const next: typeof errors = {};
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedUsername = username.trim();
+
+    if (!trimmedName) {
+      next.name = "Full name is required.";
+    } else if (trimmedName.length < 2) {
+      next.name = "Full name must be at least 2 characters.";
+    }
+
+    if (editing) {
+      if (password && password.length < 6) {
+        next.password = "Password must be at least 6 characters.";
+      }
+    } else {
+      if (!trimmedEmail) {
+        next.email = "Email is required.";
+      } else if (!EMAIL_PATTERN.test(trimmedEmail)) {
+        next.email = "Please provide a valid email address.";
+      }
+      if (!trimmedUsername) {
+        next.username = "Username is required.";
+      } else if (trimmedUsername.length < 3) {
+        next.username = "Username must be at least 3 characters.";
+      } else if (!USERNAME_PATTERN.test(trimmedUsername)) {
+        next.username =
+          "Username can only contain letters, numbers, dashes and underscores.";
+      }
+      if (!password) {
+        next.password = "Password is required.";
+      } else if (password.length < 6) {
+        next.password = "Password must be at least 6 characters.";
+      }
+    }
+
+    if (selectedRoles.length === 0) {
+      next.roles = "Select at least one role.";
+    }
+
+    return next;
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    const issues = validateForm();
+    if (Object.keys(issues).some((k) => issues[k as keyof typeof issues])) {
+      setErrors(issues);
+      toast.warning("Please fix the highlighted fields before saving.");
+      return;
+    }
+
     setSaving(true);
     try {
       if (editing) {
         await updateUser(editing.id, {
-          name,
+          name: name.trim(),
           isActive,
           roleIds: selectedRoles,
           password: password || undefined,
         });
       } else {
-        await createUser({ name, email, username, password, roleIds: selectedRoles });
+        await createUser({
+          name: name.trim(),
+          email: email.trim(),
+          username: username.trim(),
+          password,
+          roleIds: selectedRoles,
+        });
       }
+      toast.success(editing ? "User updated." : "User created.");
       await onSaved();
       onClose();
     } catch (err) {
@@ -185,18 +217,36 @@ function UserDialog({
               <Input
                 id="user-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearError("name");
+                }}
+                aria-invalid={errors.name ? true : undefined}
+                autoFocus
               />
+              {errors.name && (
+                <p className="text-xs text-[#C85C5C]" role="alert">
+                  {errors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="user-username">Username</Label>
               <Input
                 id="user-username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
+                disabled={!!editing}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  clearError("username");
+                }}
+                aria-invalid={errors.username ? true : undefined}
               />
+              {errors.username && (
+                <p className="text-xs text-[#C85C5C]" role="alert">
+                  {errors.username}
+                </p>
+              )}
             </div>
           </div>
 
@@ -206,9 +256,18 @@ function UserDialog({
               id="user-email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
+              disabled={!!editing}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                clearError("email");
+              }}
+              aria-invalid={errors.email ? true : undefined}
             />
+            {errors.email && (
+              <p className="text-xs text-[#C85C5C]" role="alert">
+                {errors.email}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -219,10 +278,20 @@ function UserDialog({
               id="user-password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required={!editing}
-              minLength={6}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                clearError("password");
+              }}
+              placeholder={
+                editing ? "Leave blank to keep the current password" : "At least 6 characters"
+              }
+              aria-invalid={errors.password ? true : undefined}
             />
+            {errors.password && (
+              <p className="text-xs text-[#C85C5C]" role="alert">
+                {errors.password}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -240,12 +309,18 @@ function UserDialog({
                         ? "border-[#4263A3] bg-[#4263A3] text-white"
                         : "border-[#E1E6ED] bg-white text-[#596273] hover:border-[#4263A3]/40"
                     }`}
+                    aria-pressed={checked}
                   >
                     {role.name}
                   </button>
                 );
               })}
             </div>
+            {errors.roles && (
+              <p className="text-xs text-[#C85C5C]" role="alert">
+                {errors.roles}
+              </p>
+            )}
           </div>
 
           {editing && (
@@ -290,6 +365,7 @@ function RoleDialog({
   onSaved: () => Promise<void>;
 }) {
   const editing = state.mode === "edit" ? state.role : null;
+  const locked = !!editing && editing.key === "admin";
   const [name, setName] = useState(editing?.name ?? "");
   const [key, setKey] = useState(editing?.key ?? "");
   const [description, setDescription] = useState(editing?.description ?? "");
@@ -300,6 +376,7 @@ function RoleDialog({
         : []
     )
   );
+  const [errors, setErrors] = useState<{ name?: string; key?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -313,7 +390,12 @@ function RoleDialog({
     return Array.from(map.entries());
   }, [permissions]);
 
+  function clearError(field: keyof typeof errors) {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
+
   function togglePermission(permissionId: string) {
+    if (locked) return;
     setSelectedPermissions((prev) => {
       const next = new Set(prev);
       if (next.has(permissionId)) {
@@ -325,21 +407,62 @@ function RoleDialog({
     });
   }
 
+  function validateForm() {
+    const next: typeof errors = {};
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      next.name = "Role name is required.";
+    } else if (trimmedName.length < 2) {
+      next.name = "Role name must be at least 2 characters.";
+    }
+
+    if (!editing) {
+      const trimmedKey = key.trim();
+      if (!trimmedKey) {
+        next.key = "Role key is required.";
+      } else if (trimmedKey.length < 3) {
+        next.key = "Role key must be at least 3 characters.";
+      } else if (!ROLE_KEY_PATTERN.test(trimmedKey)) {
+        next.key =
+          "Role key must start with a letter and only contain lowercase letters, numbers and dashes.";
+      }
+    }
+
+    return next;
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    const issues = validateForm();
+    if (Object.keys(issues).some((k) => issues[k as keyof typeof issues])) {
+      setErrors(issues);
+      toast.warning("Please fix the highlighted fields before saving.");
+      return;
+    }
+
     setSaving(true);
-    const permissionIds = Array.from(selectedPermissions);
+    const permissionIds = locked
+      ? undefined
+      : Array.from(selectedPermissions);
     try {
       if (editing) {
         await updateRole(editing.id, {
-          name,
-          description: description || undefined,
+          name: name.trim(),
+          description: description.trim() || undefined,
           permissionIds,
         });
       } else {
-        await createRole({ name, key, description, permissionIds });
+        await createRole({
+          name: name.trim(),
+          key: key.trim(),
+          description: description.trim() || undefined,
+          permissionIds: Array.from(selectedPermissions),
+        });
       }
+      toast.success(editing ? "Role updated." : "Role created.");
       await onSaved();
       onClose();
     } catch (err) {
@@ -350,7 +473,7 @@ function RoleDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit role" : "Create role"}</DialogTitle>
           <DialogDescription>
@@ -363,26 +486,53 @@ function RoleDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <p className="text-sm text-[#C85C5C]">{error}</p>}
 
+          {locked && (
+            <div className="flex items-start gap-2 rounded-lg border border-[#3C8C7A]/30 bg-[#3C8C7A]/10 p-3 text-sm text-[#2F6B5C]">
+              <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+              <p>
+                The Admin role is locked and always has all permissions. They
+                cannot be changed or unassigned.
+              </p>
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="role-name">Name</Label>
               <Input
                 id="role-name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearError("name");
+                }}
+                aria-invalid={errors.name ? true : undefined}
+                autoFocus
               />
+              {errors.name && (
+                <p className="text-xs text-[#C85C5C]" role="alert">
+                  {errors.name}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="role-key">Key</Label>
               <Input
                 id="role-key"
                 value={key}
-                onChange={(e) => setKey(e.target.value)}
+                onChange={(e) => {
+                  setKey(e.target.value);
+                  clearError("key");
+                }}
                 placeholder="e.g. auditor"
                 disabled={!!editing}
-                required
+                aria-invalid={errors.key ? true : undefined}
               />
+              {errors.key && (
+                <p className="text-xs text-[#C85C5C]" role="alert">
+                  {errors.key}
+                </p>
+              )}
             </div>
           </div>
 
@@ -396,31 +546,49 @@ function RoleDialog({
           </div>
 
           <div className="space-y-3">
-            <Label>Permissions</Label>
-            {grouped.map(([module, list]) => (
-              <div
-                key={module}
-                className="rounded-lg border border-[#E1E6ED] p-3"
-              >
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4263A3]">
-                  {module.replace(".", " ")}
-                </p>
-                <div className="grid gap-1.5">
-                  {list.map((permission) => (
-                    <label
-                      key={permission.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedPermissions.has(permission.id)}
-                        onCheckedChange={() => togglePermission(permission.id)}
-                      />
-                      {permission.name}
-                    </label>
-                  ))}
+            <div className="flex items-center justify-between">
+              <Label>Permissions</Label>
+              {!locked && typeof selectedPermissions !== "undefined" && (
+                <span className="text-xs text-muted-foreground">
+                  {selectedPermissions.size} of {permissions.length} selected
+                </span>
+              )}
+              {locked && (
+                <span className="text-xs font-medium text-[#2F6B5C]">
+                  {permissions.length} of {permissions.length} (locked)
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {grouped.map(([module, list]) => (
+                <div
+                  key={module}
+                  className="rounded-lg border border-[#E1E6ED] p-3"
+                >
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#4263A3]">
+                    {module.replace(".", " ")}
+                  </p>
+                  <div className="grid gap-1.5">
+                    {list.map((permission) => (
+                      <label
+                        key={permission.id}
+                        className={`flex items-center gap-2 text-sm ${
+                          locked ? "cursor-not-allowed opacity-60" : ""
+                        }`}
+                      >
+                        <Checkbox
+                          checked={locked ? true : selectedPermissions.has(permission.id)}
+                          onCheckedChange={() => togglePermission(permission.id)}
+                          disabled={locked}
+                        />
+                        {permission.name}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <DialogFooter>
@@ -484,19 +652,21 @@ export default function UsersPage() {
     if (!(await confirm({ title: "Delete user", message: `Delete ${user.name}? This cannot be undone.`, destructive: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteUser(user.id);
+      toast.success("User deleted.");
       await refresh();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to delete user.");
+      toast.error(err instanceof Error ? err.message : "Failed to delete user.");
     }
   }
 
   async function handleDeleteRole(role: ManagedRole) {
-    if (!(await confirm({ title: "Delete role", message: `Delete the "${role.name}" role?`, destructive: true, confirmLabel: "Delete" }))) return;
+    if (!(await confirm({ title: "Delete role", message: `Delete the "${role.name}" role? This cannot be undone.`, destructive: true, confirmLabel: "Delete" }))) return;
     try {
       await deleteRole(role.id);
+      toast.success("Role deleted.");
       await refresh();
     } catch (err) {
-      window.alert(err instanceof ApiError ? err.message : "Failed to delete role.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete role.");
     }
   }
 
@@ -522,7 +692,7 @@ export default function UsersPage() {
           User Management
         </h1>
         <p className="text-sm text-muted-foreground">
-          Manage team members, roles, and permissions.
+          Manage team members, roles, permissions, and role assignments.
         </p>
       </div>
 
@@ -530,7 +700,6 @@ export default function UsersPage() {
         <TabsList>
           {canViewUsers && <TabsTrigger value="users">Users</TabsTrigger>}
           {canViewRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
-          {canViewRoles && <TabsTrigger value="permissions">Permissions</TabsTrigger>}
         </TabsList>
 
         {canViewUsers && (
@@ -569,7 +738,8 @@ export default function UsersPage() {
                     <TableRow key={user.id}>
                       <TableCell>
                         <p className="font-medium text-[#18202F]">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Mail className="size-3" />
                           {user.email}
                         </p>
                       </TableCell>
@@ -634,20 +804,29 @@ export default function UsersPage() {
         {canViewRoles && (
           <TabsContent value="roles" className="pt-4">
             <div className="overflow-hidden rounded-xl border border-[#E1E6ED] bg-white">
-              <div className="flex items-center justify-between border-b border-[#E1E6ED] px-5 py-4">
+              <div className="flex items-center justify-between gap-3 border-b border-[#E1E6ED] px-5 py-4">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="size-5 text-[#4263A3]" />
                   <h2 className="text-base font-semibold text-[#18202F]">Roles</h2>
                 </div>
-                {canCreateRoles && (
-                  <Button
-                    size="sm"
-                    className="bg-[#4263A3] text-white hover:bg-[#344F85]"
-                    onClick={() => setRoleDialog({ mode: "create" })}
-                  >
-                    <Plus /> Add role
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {canUpdateRoles && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href="/role-permissions">
+                        <ListChecks /> Assign permissions
+                      </Link>
+                    </Button>
+                  )}
+                  {canCreateRoles && (
+                    <Button
+                      size="sm"
+                      className="bg-[#4263A3] text-white hover:bg-[#344F85]"
+                      onClick={() => setRoleDialog({ mode: "create" })}
+                    >
+                      <Plus /> Add role
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <Table>
@@ -723,18 +902,6 @@ export default function UsersPage() {
                 </TableBody>
               </Table>
             </div>
-          </TabsContent>
-        )}
-
-        {canViewRoles && (
-          <TabsContent value="permissions" className="pt-4">
-            <div className="mb-4 flex items-center gap-2">
-              <ShieldCheck className="size-5 text-[#4263A3]" />
-              <h2 className="text-base font-semibold text-[#18202F]">
-                All permissions
-              </h2>
-            </div>
-            <PermissionsView permissions={permissionList} />
           </TabsContent>
         )}
       </Tabs>
