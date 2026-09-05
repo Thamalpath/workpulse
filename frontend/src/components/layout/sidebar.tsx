@@ -3,38 +3,22 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, KeyRound, LayoutDashboard, LineChart, ShieldCheck, Users, X } from "lucide-react";
+import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { navigationItems } from "@/config/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/Logo.png";
-
-export const navigationItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Visual Insights", href: "/insights", icon: LineChart, managerOnly: true },
-  { label: "Projects", href: "/projects", icon: BarChart3 },
-  { label: "Reports", href: "/reports", icon: FileText },
-  { label: "Users", href: "/users", icon: Users, adminOnly: true },
-  { label: "Permissions", href: "/permissions", icon: ShieldCheck, adminOnly: true },
-  { label: "Role Permissions", href: "/role-permissions", icon: KeyRound, adminOnly: true },
-];
 
 export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { permissions } = useAuth();
 
-  const canViewInsights = permissions.includes("report.view.all");
-  const canManageUsers =
-    permissions.includes("user.view") ||
-    permissions.includes("role.view") ||
-    permissions.includes("permission.view");
-
-  const items = navigationItems.filter(
-    (item) =>
-      (!item.adminOnly || canManageUsers) &&
-      (!item.managerOnly || canViewInsights),
-  );
+  const hasPermission = (permission?: string) =>
+    !permission || permissions.includes(permission);
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
 
   return (
     <div className="flex flex-col gap-6">
@@ -57,25 +41,64 @@ export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
       </Link>
 
       <nav className="space-y-1">
-        {items.map((item) => {
-          const isActive =
-            pathname === item.href || pathname.startsWith(item.href + "/");
-          const Icon = item.icon;
+        {navigationItems.map((entry) => {
+          if ("children" in entry) {
+            const children = entry.children.filter((child) =>
+              hasPermission(child.permission),
+            );
+            if (children.length === 0) return null;
+            return (
+              <div key={entry.label} className="pt-4 first:pt-0">
+                {!collapsed && (
+                  <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-[#9AA3B2]">
+                    {entry.label}
+                  </p>
+                )}
+                <div className="space-y-1">
+                  {children.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg text-sm font-medium transition-colors",
+                          collapsed ? "justify-center px-2 py-2.5" : "py-2.5 pl-9 pr-3",
+                          active
+                            ? "bg-[#4263A3] text-white shadow-sm"
+                            : "text-[#596273] hover:bg-[#E1E6ED]/60 hover:text-[#18202F]",
+                        )}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <Icon className={cn("shrink-0", collapsed ? "size-5" : "size-4")} />
+                        {!collapsed && <span>{item.label}</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }
+
+          if (!hasPermission(entry.permission)) return null;
+          const Icon = entry.icon;
+          const active = isActive(entry.href);
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={entry.href}
+              href={entry.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 collapsed ? "justify-center px-2" : "px-3",
-                isActive
+                active
                   ? "bg-[#4263A3] text-white shadow-sm"
                   : "text-[#596273] hover:bg-[#E1E6ED]/60 hover:text-[#18202F]",
               )}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? entry.label : undefined}
             >
               <Icon className="size-5 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{entry.label}</span>}
             </Link>
           );
         })}
@@ -94,7 +117,7 @@ export function Sidebar({ open, onClose, collapsed = false }: SidebarProps) {
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-[#E1E6ED] bg-white py-6 transition-all duration-300 lg:flex ${
+        className={`sticky top-0 hidden h-screen flex-shrink-0 flex-col overflow-y-auto border-r border-[#E1E6ED] bg-white py-6 transition-all duration-300 lg:flex ${
           collapsed ? "w-18 px-2" : "w-64 px-5"
         }`}
       >

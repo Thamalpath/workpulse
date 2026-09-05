@@ -12,7 +12,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
-import { navigationItems } from "@/components/layout/sidebar";
+import { navigationItems } from "@/config/navigation";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -73,9 +73,15 @@ export function Navbar({
 
   const segments = pathname.split("/").filter(Boolean);
   const currentLabel =
-    navigationItems.find(
-      (item) => pathname === item.href || pathname.startsWith(item.href + "/"),
-    )?.label ?? "Dashboard";
+    navigationItems.find((item) => {
+      if ("children" in item) {
+        return item.children.some(
+          (child) =>
+            pathname === child.href || pathname.startsWith(child.href + "/"),
+        );
+      }
+      return pathname === item.href || pathname.startsWith(item.href + "/");
+    })?.label ?? "Dashboard";
 
   function getBreadcrumbItems() {
     const items: { label: string; href: string }[] = [];
