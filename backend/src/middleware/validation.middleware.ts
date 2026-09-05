@@ -4,9 +4,11 @@ import { ApiError } from "../utils/api-error.js";
 
 type Rule =
   | { required?: boolean; message?: string }
+  | { optional?: boolean; message?: string }
   | { minLength?: number; message?: string }
   | { isEmail?: boolean; message?: string }
   | { isString?: boolean; message?: string }
+  | { isBoolean?: boolean; message?: string }
   | { isArray?: boolean; message?: string }
   | { isStringArray?: boolean; message?: string }
   | { min?: number; message?: string };
@@ -20,11 +22,17 @@ function has(field: any, value: any, message?: string) {
 }
 
 function applyRule(field: string, value: any, rule: Rule) {
+  if ("optional" in rule && rule.optional && value === undefined) {
+    return;
+  }
   if ("required" in rule && rule.required) {
     has(field, value, rule.message);
   }
   if ("isString" in rule && rule.isString && typeof value !== "string") {
     throw new ApiError(400, rule.message ?? `${field} must be a string.`);
+  }
+  if ("isBoolean" in rule && rule.isBoolean && typeof value !== "boolean") {
+    throw new ApiError(400, rule.message ?? `${field} must be a boolean.`);
   }
   if ("isArray" in rule && rule.isArray && !Array.isArray(value)) {
     throw new ApiError(400, rule.message ?? `${field} must be an array.`);
