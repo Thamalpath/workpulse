@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  KeyRound,
   Loader2,
   Lock,
   Pencil,
   Plus,
-  Search,
   ShieldCheck,
   ShieldEllipsis,
   Trash2,
@@ -24,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,14 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
@@ -278,7 +269,6 @@ export default function PermissionsPage() {
 
   const [permissionList, setPermissionList] = useState<Permission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
   const [moduleFilter, setModuleFilter] = useState("all");
   const [dialog, setDialog] = useState<PermissionDialogState>(null);
   const [confirm, confirmNode] = useConfirm();
@@ -301,20 +291,10 @@ export default function PermissionsPage() {
     ).sort((a, b) => a.localeCompare(b));
   }, [permissionList]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return permissionList.filter((permission) => {
-      if (moduleFilter !== "all" && permission.module !== moduleFilter)
-        return false;
-      if (!q) return true;
-      return [
-        permission.key,
-        permission.name,
-        permission.module,
-        permission.description ?? "",
-      ].some((value) => value.toLowerCase().includes(q));
-    });
-  }, [permissionList, query, moduleFilter]);
+  const visibleData = useMemo(() => {
+    if (moduleFilter === "all") return permissionList;
+    return permissionList.filter((p) => p.module === moduleFilter);
+  }, [permissionList, moduleFilter]);
 
   async function handleDelete(permission: Permission) {
     if (
@@ -336,6 +316,96 @@ export default function PermissionsPage() {
       );
     }
   }
+
+  const columns = useMemo<DataTableColumn<Permission>[]>(() => {
+    const cols: DataTableColumn<Permission>[] = [
+      {
+        accessorKey: "name",
+        header: "Permission",
+        cell: ({ row }) => (
+          <>
+            <p className="font-medium text-[#18202F]">{row.original.name}</p>
+            {row.original.description && (
+              <p className="text-xs text-muted-foreground">
+                {row.original.description}
+              </p>
+            )}
+          </>
+        ),
+      },
+      {
+        accessorKey: "key",
+        header: "Key",
+        cell: ({ row }) => (
+          <code className="rounded bg-[#F5F7FA] px-1.5 py-0.5 text-xs text-[#596273]">
+            {row.original.key}
+          </code>
+        ),
+      },
+      {
+        accessorKey: "module",
+        header: "Module",
+        cell: ({ row }) => (
+          <Badge variant="secondary">{row.original.module}</Badge>
+        ),
+      },
+      {
+        accessorKey: "isAdminLocked",
+        header: "Admin",
+        enableSorting: false,
+        cell: ({ row }) =>
+          row.original.isAdminLocked ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-[#2F6B5C]">
+              <Lock className="size-3.5" /> Locked
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          ),
+      },
+    ];
+
+    if (canUpdate || canDelete) {
+      cols.push({
+        id: "actions",
+        enableSorting: false,
+        header: () => <div className="flex justify-end">Actions</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-1">
+            {canUpdate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() =>
+                  setDialog({ mode: "edit", permission: row.original })
+                }
+                aria-label={`Edit ${row.original.key}`}
+              >
+                <Pencil />
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                variant="ghostDestructive"
+                size="icon"
+                disabled={row.original.isAdminLocked}
+                title={
+                  row.original.isAdminLocked
+                    ? "This permission is required by the Admin role and cannot be deleted."
+                    : `Delete ${row.original.key}`
+                }
+                onClick={() => handleDelete(row.original)}
+                aria-label={`Delete ${row.original.key}`}
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
+        ),
+      });
+    }
+
+    return cols;
+  }, [canUpdate, canDelete]);
 
   if (loading) {
     return <FullPageLoader />;
@@ -359,154 +429,19 @@ export default function PermissionsPage() {
           Permissions
         </h1>
         <p className="text-sm text-muted-foreground">
-          Create, search, update, and delete permissions used across the system.
+          Create, search, sort, and manage permissions used across the system.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#E1E6ED] bg-white">
-        <div className="flex flex-col gap-3 border-b border-[#E1E6ED] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-5 text-[#4263A3]" />
-            <h2 className="text-base font-semibold text-[#18202F]">
-              All permissions
-            </h2>
-            <Badge variant="outline" className="ml-1">
-              {permissionList.length}
-            </Badge>
-          </div>
-          {canCreate && (
-            <Button
-              size="sm"
-              className="bg-[#4263A3] text-white hover:bg-[#344F85]"
-              onClick={() => setDialog({ mode: "create" })}
-            >
-              <Plus /> Add permission
-            </Button>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-3 border-b border-[#E1E6ED] px-5 py-3 sm:flex-row sm:items-center">
-          <div className="relative sm:w-72">
-            <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, key, module…"
-              className="pl-9"
-            />
-          </div>
-          <Select value={moduleFilter} onValueChange={setModuleFilter}>
-            <SelectTrigger className="sm:w-48">
-              <SelectValue placeholder="Module" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All modules</SelectItem>
-              {modules.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Permission</TableHead>
-              <TableHead>Key</TableHead>
-              <TableHead>Module</TableHead>
-              <TableHead>Admin</TableHead>
-              {(canUpdate || canDelete) && (
-                <TableHead className="text-right">Actions</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  <KeyRound className="mx-auto size-8 text-[#596273]/60" />
-                  <p className="mt-2 text-sm">
-                    {query || moduleFilter !== "all"
-                      ? "No permissions match your filters."
-                      : "No permissions found."}
-                  </p>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((permission) => (
-                <TableRow key={permission.id}>
-                  <TableCell>
-                    <p className="font-medium text-[#18202F]">
-                      {permission.name}
-                    </p>
-                    {permission.description && (
-                      <p className="text-xs text-muted-foreground">
-                        {permission.description}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <code className="rounded bg-[#F5F7FA] px-1.5 py-0.5 text-xs text-[#596273]">
-                      {permission.key}
-                    </code>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{permission.module}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    {permission.isAdminLocked ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#2F6B5C]">
-                        <Lock className="size-3.5" /> Locked
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  {(canUpdate || canDelete) && (
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {canUpdate && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setDialog({ mode: "edit", permission })
-                            }
-                            aria-label={`Edit ${permission.key}`}
-                          >
-                            <Pencil />
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghostDestructive"
-                            size="icon"
-                            disabled={permission.isAdminLocked}
-                            title={
-                              permission.isAdminLocked
-                                ? "This permission is required by the Admin role and cannot be deleted."
-                                : `Delete ${permission.key}`
-                            }
-                            onClick={() => handleDelete(permission)}
-                            aria-label={`Delete ${permission.key}`}
-                          >
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={visibleData}
+        defaultPageSize={10}
+        pageSizeOptions={[5, 10, 25, 50]}
+        defaultSorting={[{ id: "name", desc: false }]}
+        emptyMessage="No permissions found."
+        noResultsMessage="No permissions match your search or filters."
+      />
 
       {dialog && (
         <PermissionDialog
