@@ -88,7 +88,7 @@ function UserDialog({
   const [password, setPassword] = useState("");
   const [isActive, setIsActive] = useState(editing?.isActive ?? true);
   const [selectedRoles, setSelectedRoles] = useState<string[]>(
-    editing?.roles.map((role) => role.id) ?? []
+    editing?.roles.map((role) => role.id) ?? [],
   );
   const [errors, setErrors] = useState<{
     name?: string;
@@ -165,7 +165,7 @@ function UserDialog({
     const issues = validateForm();
     if (Object.keys(issues).some((k) => issues[k as keyof typeof issues])) {
       setErrors(issues);
-      toast.warning("Please fix the highlighted fields before saving.");
+      toast.warning("Please fill the required fields.");
       return;
     }
 
@@ -283,7 +283,9 @@ function UserDialog({
                 clearError("password");
               }}
               placeholder={
-                editing ? "Leave blank to keep the current password" : "At least 6 characters"
+                editing
+                  ? "Leave blank to keep the current password"
+                  : "At least 6 characters"
               }
               aria-invalid={errors.password ? true : undefined}
             />
@@ -325,10 +327,7 @@ function UserDialog({
 
           {editing && (
             <label className="flex items-center gap-2 text-sm">
-              <Checkbox
-                checked={isActive}
-                onCheckedChange={setIsActive}
-              />
+              <Checkbox checked={isActive} onCheckedChange={setIsActive} />
               Active
             </label>
           )}
@@ -373,8 +372,8 @@ function RoleDialog({
     new Set(
       state.mode === "edit"
         ? state.role.permissions.map((permission) => permission.id)
-        : []
-    )
+        : [],
+    ),
   );
   const [errors, setErrors] = useState<{ name?: string; key?: string }>({});
   const [error, setError] = useState<string | null>(null);
@@ -439,14 +438,12 @@ function RoleDialog({
     const issues = validateForm();
     if (Object.keys(issues).some((k) => issues[k as keyof typeof issues])) {
       setErrors(issues);
-      toast.warning("Please fix the highlighted fields before saving.");
+      toast.warning("Please fill the required fields.");
       return;
     }
 
     setSaving(true);
-    const permissionIds = locked
-      ? undefined
-      : Array.from(selectedPermissions);
+    const permissionIds = locked ? undefined : Array.from(selectedPermissions);
     try {
       if (editing) {
         await updateRole(editing.id, {
@@ -578,8 +575,14 @@ function RoleDialog({
                         }`}
                       >
                         <Checkbox
-                          checked={locked ? true : selectedPermissions.has(permission.id)}
-                          onCheckedChange={() => togglePermission(permission.id)}
+                          checked={
+                            locked
+                              ? true
+                              : selectedPermissions.has(permission.id)
+                          }
+                          onCheckedChange={() =>
+                            togglePermission(permission.id)
+                          }
                           disabled={locked}
                         />
                         {permission.name}
@@ -649,24 +652,44 @@ export default function UsersPage() {
   }, [refresh]);
 
   async function handleDeleteUser(user: ManageUser) {
-    if (!(await confirm({ title: "Delete user", message: `Delete ${user.name}? This cannot be undone.`, destructive: true, confirmLabel: "Delete" }))) return;
+    if (
+      !(await confirm({
+        title: "Delete user",
+        message: `Delete ${user.name}? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: "Delete",
+      }))
+    )
+      return;
     try {
       await deleteUser(user.id);
       toast.success("User deleted.");
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete user.");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete user.",
+      );
     }
   }
 
   async function handleDeleteRole(role: ManagedRole) {
-    if (!(await confirm({ title: "Delete role", message: `Delete the "${role.name}" role? This cannot be undone.`, destructive: true, confirmLabel: "Delete" }))) return;
+    if (
+      !(await confirm({
+        title: "Delete role",
+        message: `Delete the "${role.name}" role? This cannot be undone.`,
+        destructive: true,
+        confirmLabel: "Delete",
+      }))
+    )
+      return;
     try {
       await deleteRole(role.id);
       toast.success("Role deleted.");
       await refresh();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to delete role.");
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to delete role.",
+      );
     }
   }
 
@@ -730,14 +753,18 @@ export default function UsersPage() {
                     <TableHead>Username</TableHead>
                     <TableHead>Roles</TableHead>
                     <TableHead>Status</TableHead>
-                    {canUpdateUsers && <TableHead className="text-right">Actions</TableHead>}
+                    {canUpdateUsers && (
+                      <TableHead className="text-right">Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell>
-                        <p className="font-medium text-[#18202F]">{user.name}</p>
+                        <p className="font-medium text-[#18202F]">
+                          {user.name}
+                        </p>
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Mail className="size-3" />
                           {user.email}
@@ -807,12 +834,14 @@ export default function UsersPage() {
               <div className="flex items-center justify-between gap-3 border-b border-[#E1E6ED] px-5 py-4">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="size-5 text-[#4263A3]" />
-                  <h2 className="text-base font-semibold text-[#18202F]">Roles</h2>
+                  <h2 className="text-base font-semibold text-[#18202F]">
+                    Roles
+                  </h2>
                 </div>
                 <div className="flex items-center gap-2">
                   {canUpdateRoles && (
                     <Button size="sm" variant="outline" asChild>
-                      <Link href="/role-permissions">
+                      <Link href="/assign-permissions">
                         <ListChecks /> Assign permissions
                       </Link>
                     </Button>
@@ -865,7 +894,9 @@ export default function UsersPage() {
                         {role.userCount}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={role.isSystem ? "default" : "secondary"}>
+                        <Badge
+                          variant={role.isSystem ? "default" : "secondary"}
+                        >
                           {role.isSystem ? "System" : "Custom"}
                         </Badge>
                       </TableCell>

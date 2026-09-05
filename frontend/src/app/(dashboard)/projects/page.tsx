@@ -103,7 +103,7 @@ function ProjectDialog({
     const issues = validateForm(name);
     if (issues.name) {
       setErrors(issues);
-      toast.warning("Please fix the highlighted fields before saving.");
+      toast.warning("Please fill the required fields.");
       return;
     }
 

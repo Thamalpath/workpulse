@@ -123,7 +123,7 @@ function PermissionDialog({
     const issues = validateForm();
     if (Object.keys(issues).some((k) => issues[k as keyof typeof issues])) {
       setErrors(issues);
-      toast.warning("Please fix the highlighted fields before saving.");
+      toast.warning("Please fill the required fields");
       return;
     }
 
@@ -157,7 +157,9 @@ function PermissionDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? "Edit permission" : "Add permission"}</DialogTitle>
+          <DialogTitle>
+            {editing ? "Edit permission" : "Add permission"}
+          </DialogTitle>
           <DialogDescription>
             {editing
               ? "Update the permission details."
@@ -235,7 +237,9 @@ function PermissionDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="permission-description">Description (optional)</Label>
+            <Label htmlFor="permission-description">
+              Description (optional)
+            </Label>
             <Textarea
               id="permission-description"
               value={description}
@@ -246,7 +250,12 @@ function PermissionDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
+              disabled={saving}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
@@ -288,14 +297,15 @@ export default function PermissionsPage() {
 
   const modules = useMemo(() => {
     return Array.from(
-      new Set(permissionList.map((p) => p.module).filter(Boolean))
+      new Set(permissionList.map((p) => p.module).filter(Boolean)),
     ).sort((a, b) => a.localeCompare(b));
   }, [permissionList]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return permissionList.filter((permission) => {
-      if (moduleFilter !== "all" && permission.module !== moduleFilter) return false;
+      if (moduleFilter !== "all" && permission.module !== moduleFilter)
+        return false;
       if (!q) return true;
       return [
         permission.key,
@@ -307,18 +317,23 @@ export default function PermissionsPage() {
   }, [permissionList, query, moduleFilter]);
 
   async function handleDelete(permission: Permission) {
-    if (!(await confirm({
-      title: "Delete permission",
-      message: `Delete the "${permission.key}" permission? This removes it from every role except the Admin role, which cannot be changed.`,
-      destructive: true,
-      confirmLabel: "Delete",
-    }))) return;
+    if (
+      !(await confirm({
+        title: "Delete permission",
+        message: `Delete the "${permission.key}" permission? This removes it from every role except the Admin role, which cannot be changed.`,
+        destructive: true,
+        confirmLabel: "Delete",
+      }))
+    )
+      return;
     try {
       await deletePermission(permission.id);
       toast.success("Permission deleted.");
       await refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete permission.");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete permission.",
+      );
     }
   }
 
@@ -355,7 +370,9 @@ export default function PermissionsPage() {
             <h2 className="text-base font-semibold text-[#18202F]">
               All permissions
             </h2>
-            <Badge variant="outline" className="ml-1">{permissionList.length}</Badge>
+            <Badge variant="outline" className="ml-1">
+              {permissionList.length}
+            </Badge>
           </div>
           {canCreate && (
             <Button
@@ -408,7 +425,10 @@ export default function PermissionsPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={5}
+                  className="py-10 text-center text-muted-foreground"
+                >
                   <KeyRound className="mx-auto size-8 text-[#596273]/60" />
                   <p className="mt-2 text-sm">
                     {query || moduleFilter !== "all"
@@ -421,7 +441,9 @@ export default function PermissionsPage() {
               filtered.map((permission) => (
                 <TableRow key={permission.id}>
                   <TableCell>
-                    <p className="font-medium text-[#18202F]">{permission.name}</p>
+                    <p className="font-medium text-[#18202F]">
+                      {permission.name}
+                    </p>
                     {permission.description && (
                       <p className="text-xs text-muted-foreground">
                         {permission.description}
