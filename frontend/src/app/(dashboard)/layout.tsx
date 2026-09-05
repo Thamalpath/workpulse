@@ -23,11 +23,7 @@ export default function DashboardLayout({
           collapsed={collapsed}
         />
 
-        <div
-          className={`flex min-w-0 flex-1 flex-col transition-all duration-300 ${
-            collapsed ? "lg:pl-18" : "lg:pl-64"
-          }`}
-        >
+        <div className="flex min-w-0 flex-1 flex-col">
           <Navbar
             onOpenSidebar={() => setMobileOpen(true)}
             collapsed={collapsed}

@@ -124,7 +124,7 @@ export default function ReportsPage() {
     : reports.filter((report) => report.status === statusFilter);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <div>

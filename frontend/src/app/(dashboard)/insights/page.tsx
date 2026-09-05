@@ -132,7 +132,7 @@ export default function InsightsPage() {
   const rangeText = `${formatDate(startDate)} – ${formatDate(endDate)}`;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       {/* Page Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>

@@ -709,7 +709,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight text-[#18202F] sm:text-3xl">
           User Management
