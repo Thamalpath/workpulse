@@ -1,6 +1,0 @@
-{$DOMAIN} {
-	encode gzip
-
-	# Everything (pages + the Next rewrites proxy for /api) goes to the Next server.
-	reverse_proxy frontend:3000
-}

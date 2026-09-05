@@ -123,13 +123,10 @@ export function ProjectWorkloadChart({
                 fontSize: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
-formatter={(value) => {
-                  const n = Number(value ?? 0);
-                  return [
-                    viewMetric === "tasks" ? `${n} tasks` : `${n} hours`,
-                    viewMetric === "tasks" ? "Task Count" : "Hours Logged",
-                  ];
-                }}
+              formatter={(value: number) => [
+                viewMetric === "tasks" ? `${value} tasks` : `${value} hours`,
+                viewMetric === "tasks" ? "Task Count" : "Hours Logged",
+              ]}
             />
             <Bar
               dataKey={viewMetric === "tasks" ? "taskCount" : "totalHours"}

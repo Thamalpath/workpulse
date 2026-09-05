@@ -100,13 +100,10 @@ export function CategoryTimeChart({
                   fontSize: "12px",
                   boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
                 }}
-                formatter={(value, name) => {
-                  const hours = Number(value ?? 0);
-                  return [
-                    `${hours}h (${Math.round((hours / totalHours) * 100)}%)`,
-                    name,
-                  ];
-                }}
+                formatter={(value: number, name: string) => [
+                  `${value}h (${Math.round((value / totalHours) * 100)}%)`,
+                  name,
+                ]}
               />
             </PieChart>
           </ResponsiveContainer>
