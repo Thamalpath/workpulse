@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, FileText, LayoutDashboard, Users, X } from "lucide-react";
+import { BarChart3, FileText, LayoutDashboard, LineChart, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -12,6 +12,7 @@ import logo from "@/assets/Logo.png";
 
 export const navigationItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Visual Insights", href: "/insights", icon: LineChart, managerOnly: true },
   { label: "Projects", href: "/projects", icon: BarChart3 },
   { label: "Reports", href: "/reports", icon: FileText },
   { label: "Users", href: "/users", icon: Users, adminOnly: true },
@@ -21,11 +22,14 @@ export function SidebarContent({ collapsed = false }: { collapsed?: boolean }) {
   const pathname = usePathname();
   const { permissions } = useAuth();
 
+  const canViewInsights = permissions.includes("report.view.all");
   const canManageUsers =
     permissions.includes("user.view") || permissions.includes("role.view");
 
   const items = navigationItems.filter(
-    (item) => !item.adminOnly || canManageUsers,
+    (item) =>
+      (!item.adminOnly || canManageUsers) &&
+      (!item.managerOnly || canViewInsights),
   );
 
   return (

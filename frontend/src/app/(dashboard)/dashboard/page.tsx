@@ -16,6 +16,7 @@ import {
   FolderKanban,
   Layers,
   LayoutGrid,
+  LineChart,
   ListFilter,
   Loader2,
   RefreshCw,
@@ -359,6 +360,19 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {canViewAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="h-9 gap-1.5 text-xs font-semibold text-[#4263A3] border-[#4263A3]/30 hover:bg-blue-50"
+            >
+              <Link href="/insights">
+                <LineChart className="size-3.5" />
+                Visual Insights
+              </Link>
+            </Button>
+          )}
           <TeamDateFilter
             startDate={startDate}
             endDate={endDate}
