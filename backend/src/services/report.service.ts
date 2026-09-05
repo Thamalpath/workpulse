@@ -337,16 +337,394 @@ export async function listMyReports(userId: string) {
   return rows.map(mapReport);
 }
 
-export async function listAllReports() {
+export type ReportListFilters = {
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+  from?: string;
+  to?: string;
+  status?: ReportStatus;
+};
+
+export async function listAllReports(filters: ReportListFilters = {}) {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (filters.memberId !== undefined) {
+    where.push("wr.userId = ?");
+    params.push(filters.memberId);
+  }
+  if (filters.projectId !== undefined) {
+    where.push("wr.projectId = ?");
+    params.push(filters.projectId);
+  }
+  if (filters.category !== undefined) {
+    where.push("EXISTS (SELECT 1 FROM ReportHoursWorked rh WHERE rh.reportId = wr.id AND rh.category = ?)");
+    params.push(filters.category);
+  }
+  if (filters.from !== undefined) {
+    where.push("wr.weekStartDate >= ?");
+    params.push(filters.from);
+  }
+  if (filters.to !== undefined) {
+    where.push("wr.weekStartDate <= ?");
+    params.push(filters.to);
+  }
+  if (filters.status !== undefined) {
+    where.push("wr.status = ?");
+    params.push(filters.status);
+  }
+  const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
   const rows = (await query(
     `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.versionNumber, wr.notes, wr.createdAt, wr.updatedAt,
             u.name AS userName, p.name AS projectName
      FROM WeeklyReport wr
      LEFT JOIN User u ON u.id = wr.userId
      LEFT JOIN Project p ON p.id = wr.projectId
-     ORDER BY wr.weekStartDate DESC`
+     ${whereSql}
+     ORDER BY wr.weekStartDate DESC, u.name ASC`,
+    params
   )) as ReportRow[];
   return rows.map(mapReport);
+}
+
+export type TeamMemberStatus = ReportStatus | "not_started";
+
+export type TeamWeeklyResult = {
+  weekStart: string;
+  weekEnd: string;
+  members: {
+    id: string;
+    name: string;
+    email: string;
+    status: TeamMemberStatus;
+    reports: ReturnType<typeof mapReport>[];
+  }[];
+  summary: {
+    total: number;
+    submitted: number;
+    needs_correction: number;
+    approved: number;
+    draft: number;
+    not_started: number;
+    completionRate: number;
+  };
+};
+
+function currentWeekRange(): { from: string; to: string } {
+  const now = new Date();
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: toDateParam(monday), to: toDateParam(sunday) };
+}
+
+function resolveWeekRange(from?: string, to?: string): { from: string; to: string } {
+  if (from || to) {
+    const resolved = { from: from ?? to!, to: to ?? from! };
+    if (resolved.from > resolved.to) {
+      throw new ApiError(400, "The start date must be on or before the end date.");
+    }
+    return resolved;
+  }
+  return currentWeekRange();
+}
+
+async function getTeamRoster(args: {
+  selfOnly: boolean;
+  selfId: string;
+  memberId?: string;
+}): Promise<{ id: string | number; name: string; email: string }[]> {
+  const where = ["u.isActive = 1"];
+  const params: unknown[] = [];
+  if (args.selfOnly) {
+    where.push("u.id = ?");
+    params.push(args.selfId);
+  } else if (args.memberId !== undefined) {
+    where.push("u.id = ?");
+    params.push(args.memberId);
+  }
+  return (await query(
+    `SELECT DISTINCT u.id, u.name, u.email
+     FROM User u
+     JOIN UserRole ur ON ur.userId = u.id
+     JOIN Role r ON r.id = ur.roleId
+     JOIN RolePermission rp ON rp.roleId = r.id
+     JOIN Permission p ON p.id = rp.permissionId
+     WHERE ${where.join(" AND ")} AND p.\`key\` = ?
+     ORDER BY u.name ASC`,
+    [...params, PERMISSIONS.REPORT_SUBMIT]
+  )) as { id: string | number; name: string; email: string }[];
+}
+
+export async function listTeamWeekly(args: {
+  from?: string;
+  to?: string;
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+  selfOnly: boolean;
+  selfId: string;
+}) {
+  const { from, to } = resolveWeekRange(args.from, args.to);
+
+  const roster = await getTeamRoster({
+    selfOnly: args.selfOnly,
+    selfId: args.selfId,
+    ...(args.memberId !== undefined ? { memberId: args.memberId } : {}),
+  });
+
+  const reportWhere = ["wr.weekStartDate BETWEEN ? AND ?"];
+  const reportParams: unknown[] = [from, to];
+  if (args.projectId !== undefined) {
+    reportWhere.push("wr.projectId = ?");
+    reportParams.push(args.projectId);
+  }
+  if (args.category !== undefined) {
+    reportWhere.push("EXISTS (SELECT 1 FROM ReportHoursWorked rh WHERE rh.reportId = wr.id AND rh.category = ?)");
+    reportParams.push(args.category);
+  }
+  if (args.selfOnly) {
+    reportWhere.push("wr.userId = ?");
+    reportParams.push(args.selfId);
+  }
+  const reportRows = (await query(
+    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.versionNumber, wr.notes, wr.createdAt, wr.updatedAt,
+            u.name AS userName, p.name AS projectName
+     FROM WeeklyReport wr
+     LEFT JOIN User u ON u.id = wr.userId
+     LEFT JOIN Project p ON p.id = wr.projectId
+     WHERE ${reportWhere.join(" AND ")}
+     ORDER BY wr.weekStartDate ASC, wr.updatedAt ASC, wr.id ASC`,
+    reportParams
+  )) as ReportRow[];
+
+  const byUser = new Map<string, ReportRow[]>();
+  for (const row of reportRows) {
+    const key = toId(row.userId);
+    const list = byUser.get(key) ?? [];
+    list.push(row);
+    byUser.set(key, list);
+  }
+
+  const members = roster.map((member) => {
+    const id = toId(member.id);
+    const reports = (byUser.get(id) ?? []).map(mapReport);
+    const latest = reports[reports.length - 1];
+    return {
+      id,
+      name: member.name,
+      email: member.email,
+      status: (latest?.status ?? "not_started") as TeamMemberStatus,
+      reports,
+    };
+  });
+
+  const counts: Record<TeamMemberStatus, number> = {
+    submitted: 0,
+    needs_correction: 0,
+    approved: 0,
+    draft: 0,
+    not_started: 0,
+  };
+  for (const member of members) {
+    counts[member.status] += 1;
+  }
+  const started = members.length - counts.not_started;
+  const completionRate =
+    members.length > 0 ? Math.round((started / members.length) * 100) : 0;
+
+  return {
+    weekStart: from,
+    weekEnd: to,
+    members,
+    summary: { total: members.length, ...counts, completionRate },
+  } satisfies TeamWeeklyResult;
+}
+
+export type TeamSectionKey =
+  | "tasks"
+  | "next_week_tasks"
+  | "blockers"
+  | "achievements"
+  | "hours";
+
+type TeamSectionRowItem = {
+  tasks: { taskName: string; priority: string; plannedPercent: number; actualPercent: number; status: string; timePlanned?: number; timeSpent?: number; deliverable?: string };
+  next_week_tasks: { taskName: string; priority: string; status: string };
+  blockers: { description: string; isKeyIssue: boolean };
+  achievements: { description: string; isKeyAchievement: boolean };
+  hours: { category: string; hours: number };
+};
+
+export async function listTeamSections(args: {
+  from?: string;
+  to?: string;
+  section: TeamSectionKey;
+  memberId?: string;
+  projectId?: string;
+  category?: string;
+  selfOnly: boolean;
+  selfId: string;
+}) {
+  const { from, to } = resolveWeekRange(args.from, args.to);
+
+  const defs: Record<
+    TeamSectionKey,
+    {
+      selectSql: string;
+      joinSql: string;
+      nullCheck: string;
+      orderSql: string;
+      mapItem: (row: Record<string, unknown>) => TeamSectionRowItem[TeamSectionKey];
+    }
+  > = {
+    tasks: {
+      selectSql: `rt.taskName, rt.priority, rt.plannedPercent, rt.actualPercent, rt.status, rt.timePlanned, rt.timeSpent, rt.deliverable`,
+      joinSql: `LEFT JOIN ReportTask rt ON rt.reportId = wr.id`,
+      nullCheck: `taskName`,
+      orderSql: `rt.sortOrder ASC, rt.id ASC`,
+      mapItem: (r) => {
+        const item: TeamSectionRowItem["tasks"] = {
+          taskName: r.taskName as string,
+          priority: r.priority as string,
+          plannedPercent: Number(r.plannedPercent ?? 0),
+          actualPercent: Number(r.actualPercent ?? 0),
+          status: r.status as string,
+        };
+        if (r.timePlanned != null) item.timePlanned = Number(r.timePlanned);
+        if (r.timeSpent != null) item.timeSpent = Number(r.timeSpent);
+        if (r.deliverable != null) item.deliverable = r.deliverable as string;
+        return item;
+      },
+    },
+    next_week_tasks: {
+      selectSql: `rnt.taskName, rnt.priority, rnt.status`,
+      joinSql: `LEFT JOIN ReportNextWeekTask rnt ON rnt.reportId = wr.id`,
+      nullCheck: `taskName`,
+      orderSql: `rnt.sortOrder ASC, rnt.id ASC`,
+      mapItem: (r) => ({
+        taskName: r.taskName as string,
+        priority: r.priority as string,
+        status: r.status as string,
+      }),
+    },
+    blockers: {
+      selectSql: `rb.description, rb.isKeyIssue`,
+      joinSql: `LEFT JOIN ReportBlocker rb ON rb.reportId = wr.id`,
+      nullCheck: `description`,
+      orderSql: `rb.id ASC`,
+      mapItem: (r) => ({
+        description: r.description as string,
+        isKeyIssue: toBoolean(r.isKeyIssue),
+      }),
+    },
+    achievements: {
+      selectSql: `ra.description, ra.isKeyAchievement`,
+      joinSql: `LEFT JOIN ReportAchievement ra ON ra.reportId = wr.id`,
+      nullCheck: `description`,
+      orderSql: `ra.id ASC`,
+      mapItem: (r) => ({
+        description: r.description as string,
+        isKeyAchievement: toBoolean(r.isKeyAchievement),
+      }),
+    },
+    hours: {
+      selectSql: `rh.category, rh.hours`,
+      joinSql: `LEFT JOIN ReportHoursWorked rh ON rh.reportId = wr.id`,
+      nullCheck: `category`,
+      orderSql: `rh.id ASC`,
+      mapItem: (r) => ({
+        category: r.category as string,
+        hours: Number(r.hours ?? 0),
+      }),
+    },
+  };
+
+  const def = defs[args.section];
+  if (!def) {
+    throw new ApiError(400, "Unknown section. Allowed: tasks, next_week_tasks, blockers, achievements, hours.");
+  }
+
+  const reportWhere = ["wr.weekStartDate BETWEEN ? AND ?"];
+  const reportParams: unknown[] = [from, to];
+  if (args.projectId !== undefined) {
+    reportWhere.push("wr.projectId = ?");
+    reportParams.push(args.projectId);
+  }
+  if (args.category !== undefined) {
+    reportWhere.push("EXISTS (SELECT 1 FROM ReportHoursWorked rh WHERE rh.reportId = wr.id AND rh.category = ?)");
+    reportParams.push(args.category);
+  }
+  if (args.selfOnly) {
+    reportWhere.push("wr.userId = ?");
+    reportParams.push(args.selfId);
+  } else if (args.memberId !== undefined) {
+    reportWhere.push("wr.userId = ?");
+    reportParams.push(args.memberId);
+  }
+
+  const rows = (await query(
+    `SELECT wr.id AS reportId,
+            u.id AS userId,
+            u.name AS userName,
+            wr.status AS reportStatus,
+            wr.weekStartDate,
+            wr.weekEndDate,
+            p.name AS projectName,
+            ${def.selectSql}
+     FROM WeeklyReport wr
+     JOIN User u ON u.id = wr.userId
+     LEFT JOIN Project p ON p.id = wr.projectId
+     ${def.joinSql}
+     WHERE ${reportWhere.join(" AND ")}
+     ORDER BY u.name ASC, wr.weekStartDate ASC, ${def.orderSql}`,
+    reportParams
+  )) as (Record<string, unknown> & {
+    reportId: string | number;
+    userId: string | number;
+    userName: string;
+    reportStatus: ReportStatus;
+    weekStartDate: string;
+    weekEndDate: string;
+    projectName: string | null;
+  })[];
+
+  const groups = new Map<
+    string,
+    {
+      reportId: string;
+      userId: string;
+      userName: string;
+      status: ReportStatus;
+      weekStartDate: string;
+      weekEndDate: string;
+      projectName: string | null;
+      items: TeamSectionRowItem[TeamSectionKey][];
+    }
+  >();
+
+  for (const row of rows) {
+    const key = toId(row.reportId);
+    const group = groups.get(key) ?? {
+      reportId: key,
+      userId: toId(row.userId),
+      userName: row.userName,
+      status: row.reportStatus,
+      weekStartDate: toDateString(row.weekStartDate),
+      weekEndDate: toDateString(row.weekEndDate),
+      projectName: row.projectName,
+      items: [],
+    };
+    if ((row as Record<string, unknown>)[def.nullCheck] != null) {
+      group.items.push(def.mapItem(row as Record<string, unknown>));
+    }
+    groups.set(key, group);
+  }
+
+  return Array.from(groups.values());
 }
 
 export async function getReportById(id: string) {
@@ -552,4 +930,26 @@ export async function transitionStatus(id: string, userId: string, newStatus: st
   });
 
   return getReportById(id);
+}
+
+export async function getAvailableCategories(): Promise<string[]> {
+  const defaultCategories = [
+    "Development",
+    "Design",
+    "Meetings",
+    "Research",
+    "Documentation",
+    "Testing",
+    "Other",
+  ];
+  try {
+    const rows = (await query(
+      `SELECT DISTINCT category FROM ReportHoursWorked WHERE category IS NOT NULL AND category != '' ORDER BY category ASC`
+    )) as { category: string }[];
+    const dbCategories = rows.map((r) => r.category);
+    const set = new Set([...defaultCategories, ...dbCategories]);
+    return Array.from(set).sort();
+  } catch {
+    return defaultCategories;
+  }
 }

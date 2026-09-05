@@ -3,6 +3,9 @@ import { Router } from "express";
 import {
   getMyReports,
   getAllReports,
+  getTeamWeekly,
+  getTeamSections,
+  getReportCategories,
   getReport,
   postReport,
   patchReport,
@@ -24,6 +27,9 @@ const router = Router();
 router.use(authenticate(true));
 
 router.get("/my", getMyReports);
+router.get("/team/sections", getTeamSections);
+router.get("/team", getTeamWeekly);
+router.get("/categories", getReportCategories);
 router.get("/", requirePermission(PERMISSIONS.REPORT_VIEW_ALL), getAllReports);
 
 router.get("/:id", getReport);
