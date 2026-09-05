@@ -5,18 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  CheckCircle,
+  ClipboardCheck,
   FileText,
   Pencil,
   Plus,
-  RotateCcw,
   Send,
   Trash2,
-  XCircle,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -26,20 +30,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FullPageLoader } from "@/components/loader";
+import { ReviewDialog } from "@/components/reports/review-dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { useConfirm } from "@/hooks/use-confirm";
 import { encodeId } from "@/lib/id";
+import { formatDate } from "@/lib/date";
 import {
   getMyReports,
   getAllReports,
   deleteReport,
   submitReport,
-  approveReport,
-  requestCorrection,
+  reviewReport,
   type Report,
+  type ReportStatus,
+  type ReviewAction,
   STATUS_LABELS,
   STATUS_COLORS,
 } from "@/services/report.service";
+
+const STATUS_FILTERS: (ReportStatus | "all")[] = [
+  "all",
+  "draft",
+  "submitted",
+  "needs_correction",
+  "approved",
+];
 
 export default function ReportsPage() {
   const { permissions, user } = useAuth();
@@ -48,6 +63,8 @@ export default function ReportsPage() {
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | "all">("all");
+  const [reviewTarget, setReviewTarget] = useState<Report | null>(null);
   const router = useRouter();
   const [confirm, confirmNode] = useConfirm();
 
@@ -86,32 +103,10 @@ export default function ReportsPage() {
     }
   }
 
-  async function handleApprove(id: string) {
-    if (!(await confirm({ title: "Approve report", message: "Approve this report?" }))) return;
-    try {
-      await approveReport(id);
-      await refresh();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to approve report.");
-    }
-  }
-
-  async function handleRequestCorrection(id: string) {
-    if (!(await confirm({ title: "Request correction", message: "Request correction for this report?" }))) return;
-    try {
-      await requestCorrection(id);
-      await refresh();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to request correction.");
-    }
-  }
-
-  function formatDate(dateStr: string) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-    const d = match
-      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-      : new Date(dateStr);
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  async function handleReview(action: ReviewAction, comment: string) {
+    if (!reviewTarget) return;
+    await reviewReport(reviewTarget.id, action, comment);
+    await refresh();
   }
 
   function formatWeekRange(start: string, end: string) {
@@ -123,6 +118,10 @@ export default function ReportsPage() {
   }
 
   const isManager = canViewAll && (permissions.includes("report.approve") || permissions.includes("role.view"));
+
+  const visibleReports = statusFilter === "all"
+    ? reports
+    : reports.filter((report) => report.status === statusFilter);
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
@@ -152,6 +151,29 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          {visibleReports.length} {visibleReports.length === 1 ? "report" : "reports"}
+        </p>
+        {isManager && (
+          <Select
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value as ReportStatus | "all")}
+          >
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTERS.map((status) => (
+                <SelectItem key={status} value={status}>
+                  {status === "all" ? "All statuses" : STATUS_LABELS[status as ReportStatus]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-[#E1E6ED] bg-white">
         <Table>
           <TableHeader>
@@ -165,7 +187,7 @@ export default function ReportsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {reports.length === 0 ? (
+            {visibleReports.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={isManager ? 6 : 5}>
                   <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -176,7 +198,7 @@ export default function ReportsPage() {
                     <p className="mt-1 text-xs text-muted-foreground">
                       {canCreate
                         ? "Create your first weekly report to get started."
-                        : "No reports have been submitted."}
+                        : "No reports match this filter."}
                     </p>
                     {canCreate && (
                       <Button asChild size="sm" className="mt-4 bg-[#4263A3] text-white hover:bg-[#344F85]">
@@ -189,13 +211,12 @@ export default function ReportsPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              reports.map((report) => {
+              visibleReports.map((report) => {
                 const isOwn = String(report.userId) === String(user?.id);
                 const canEditOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
                 const canDeleteOwn = isOwn && report.status === "draft";
-                const canSubmitOwn = isOwn && report.status === "draft";
-                const canApprove = isManager && report.status === "submitted";
-                const canCorrect = isManager && report.status === "submitted";
+                const canSubmitOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
+                const canReview = isManager && report.status === "submitted";
 
                 return (
                   <TableRow key={report.id}>
@@ -251,26 +272,15 @@ export default function ReportsPage() {
                             <Send className="size-4" />
                           </Button>
                         )}
-                        {canApprove && (
+                        {canReview && (
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-green-600"
-                            onClick={() => handleApprove(report.id)}
-                            aria-label="Approve report"
+                            className="text-[#4263A3]"
+                            onClick={() => setReviewTarget(report)}
+                            aria-label="Review report"
                           >
-                            <CheckCircle className="size-4" />
-                          </Button>
-                        )}
-                        {canCorrect && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-yellow-600"
-                            onClick={() => handleRequestCorrection(report.id)}
-                            aria-label="Request correction"
-                          >
-                            <RotateCcw className="size-4" />
+                            <ClipboardCheck className="size-4" />
                           </Button>
                         )}
                         {canDeleteOwn && (
@@ -292,6 +302,16 @@ export default function ReportsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <ReviewDialog
+        key={reviewTarget?.id ?? "closed"}
+        open={!!reviewTarget}
+        onOpenChange={(open) => {
+          if (!open) setReviewTarget(null);
+        }}
+        onReview={handleReview}
+        defaultAction="request_correction"
+      />
 
       {confirmNode}
     </div>

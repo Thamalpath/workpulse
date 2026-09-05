@@ -28,6 +28,7 @@ CREATE TABLE `WeeklyReport` (
     `weekStartDate` DATE NOT NULL,
     `weekEndDate` DATE NOT NULL,
     `status` ENUM('draft', 'submitted', 'needs_correction', 'approved') NOT NULL DEFAULT 'draft',
+    `versionNumber` INT NOT NULL DEFAULT 0,
     `notes` TEXT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

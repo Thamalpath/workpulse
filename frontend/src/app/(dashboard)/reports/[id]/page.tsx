@@ -2,19 +2,20 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle,
   Clock,
   FileText,
+  History,
   ListTree,
+  MessageSquareWarning,
   Pencil,
   RotateCcw,
   Send,
   Star,
   Target,
-  AlertTriangle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,30 +29,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { FullPageLoader } from "@/components/loader";
+import { ReviewDialog } from "@/components/reports/review-dialog";
+import { ReviewHistory } from "@/components/reports/review-history";
+import { VersionHistory } from "@/components/reports/version-history";
 import { useAuth } from "@/contexts/auth-context";
 import { useConfirm } from "@/hooks/use-confirm";
 import { decodeId, encodeId } from "@/lib/id";
+import { formatDate } from "@/lib/date";
 import {
   getReport,
   submitReport,
-  approveReport,
-  requestCorrection,
+  reviewReport,
   type Report,
+  type ReviewAction,
   STATUS_LABELS,
   STATUS_COLORS,
 } from "@/services/report.service";
-
-function formatDate(dateStr: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-  const d = match
-    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
-    : new Date(dateStr);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function formatWeekRange(start: string, end: string) {
   return `${formatDate(start)} — ${formatDate(end)}`;
@@ -62,7 +55,6 @@ export default function ReportDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
   const { permissions, user } = useAuth();
   const canApprove = permissions.includes("report.approve");
   const [confirm, confirmNode] = useConfirm();
@@ -70,6 +62,9 @@ export default function ReportDetailPage({
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewDefaultAction, setReviewDefaultAction] = useState<ReviewAction>("request_correction");
+  const [reviewSession, setReviewSession] = useState(0);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -98,26 +93,16 @@ export default function ReportDetailPage({
     }
   }
 
-  async function handleApprove() {
+  async function handleReview(action: ReviewAction, comment: string) {
     if (!report) return;
-    if (!(await confirm({ title: "Approve report", message: "Approve this report?" }))) return;
-    try {
-      await approveReport(report.id);
-      await fetchReport();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to approve.");
-    }
+    await reviewReport(report.id, action, comment);
+    await fetchReport();
   }
 
-  async function handleCorrection() {
-    if (!report) return;
-    if (!(await confirm({ title: "Request correction", message: "Request correction for this report?" }))) return;
-    try {
-      await requestCorrection(report.id);
-      await fetchReport();
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to request correction.");
-    }
+  function openReview(action: ReviewAction) {
+    setReviewDefaultAction(action);
+    setReviewSession((s) => s + 1);
+    setReviewOpen(true);
   }
 
   if (loading) {
@@ -137,14 +122,20 @@ export default function ReportDetailPage({
   }
 
   const isOwn = String(report.userId) === String(user?.id);
+  const isManager = canApprove && !isOwn;
   const canEditOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
-  const canSubmitOwn = isOwn && report.status === "draft";
-  const canApproveAction = canApprove && report.status === "submitted";
-  const canCorrectAction = canApprove && report.status === "submitted";
+  const canSubmitOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
+  const canReviewAction = isManager && report.status === "submitted";
 
   const totalHours = report.hoursWorked?.reduce((sum, h) => sum + h.hours, 0) ?? 0;
   const keyBlockers = report.blockers?.filter((b) => b.isKeyIssue).length ?? 0;
   const keyAchievements = report.achievements?.filter((a) => a.isKeyAchievement).length ?? 0;
+
+  const latestCorrection =
+    report.reviews?.find((r) => r.action === "request_correction") ?? null;
+
+  const hasHistory =
+    (report.reviews?.length ?? 0) > 0 || (report.versions?.length ?? 0) > 0 || isManager;
 
   const sections = [
     { id: "overview", label: "Overview" },
@@ -164,6 +155,15 @@ export default function ReportDetailPage({
     (s.id === "hours" && (report.hoursWorked?.length ?? 0) > 0),
   );
 
+  if (hasHistory) {
+    sections.push({ id: "reviews", label: "Reviews" });
+    sections.push({ id: "versions", label: "Versions" });
+  }
+
+  const reviewCount = report.reviews?.length ?? 0;
+  const versionCount = report.versions?.length ?? 0;
+  const latestCorrectionCount = report.reviews?.filter((r) => r.action === "request_correction").length ?? 0;
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 xl:max-w-6xl 2xl:max-w-[1600px]">
       {/* Header */}
@@ -182,9 +182,12 @@ export default function ReportDetailPage({
           <p className="mt-1 text-sm text-muted-foreground">
             {formatWeekRange(report.weekStartDate, report.weekEndDate)}
             {report.projectName && <span> · {report.projectName}</span>}
+            {report.versionNumber > 0 && (
+              <span> · Version {report.versionNumber}</span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${STATUS_COLORS[report.status]}`}>
             {STATUS_LABELS[report.status]}
           </span>
@@ -197,21 +200,44 @@ export default function ReportDetailPage({
           )}
           {canSubmitOwn && (
             <Button size="sm" className="bg-[#4263A3] text-white hover:bg-[#344F85]" onClick={handleSubmit}>
-              <Send className="size-4" /> Submit
+              <Send className="size-4" /> {report.status === "needs_correction" ? "Resubmit" : "Submit"}
             </Button>
           )}
-          {canApproveAction && (
-            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={handleApprove}>
-              <CheckCircle className="size-4" /> Approve
-            </Button>
-          )}
-          {canCorrectAction && (
-            <Button size="sm" variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50" onClick={handleCorrection}>
-              <RotateCcw className="size-4" /> Request Correction
-            </Button>
+          {canReviewAction && (
+            <>
+              <Button size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={() => openReview("approved")}>
+                <CheckCircle className="size-4" /> Approve
+              </Button>
+              <Button size="sm" variant="outline" className="border-yellow-500 text-yellow-700 hover:bg-yellow-50" onClick={() => openReview("request_correction")}>
+                <RotateCcw className="size-4" /> Request Changes
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Needs correction banner (team member) */}
+      {report.status === "needs_correction" && latestCorrection && (
+        <div id="correction" className="scroll-mt-24 rounded-xl border border-yellow-300 bg-yellow-50 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-yellow-800">
+            <MessageSquareWarning className="size-4" />
+            Changes requested by {latestCorrection.reviewerName}
+          </div>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-[#18202F]">
+            {latestCorrection.comment}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Made against version {latestCorrection.versionNumber}
+          </p>
+          {canEditOwn && (
+            <Button asChild size="sm" className="mt-3 bg-[#4263A3] text-white hover:bg-[#344F85]">
+              <Link href={`/reports/${encodeId(report.id)}/edit`}>
+                <Pencil className="size-4" /> Edit and resubmit
+              </Link>
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Section Nav */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#E1E6ED] bg-white p-2 shadow-sm">
@@ -391,11 +417,57 @@ export default function ReportDetailPage({
         </div>
       )}
 
+      {/* Review history */}
+      {hasHistory && (
+        <div id="reviews" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquareWarning className="size-4 text-[#4263A3]" />
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3]">
+                Review History
+              </h3>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {reviewCount} {reviewCount === 1 ? "review" : "reviews"} ·{" "}
+              {latestCorrectionCount} {latestCorrectionCount === 1 ? "correction" : "corrections"}
+            </span>
+          </div>
+          <ReviewHistory reviews={report.reviews ?? []} />
+        </div>
+      )}
+
+      {/* Version history */}
+      {hasHistory && (
+        <div id="versions" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 shadow-sm">
+          <div className="mb-2 flex items-center gap-2">
+            <History className="size-4 text-[#4263A3]" />
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#4263A3]">
+              Version History
+            </h3>
+            <span className="text-xs text-muted-foreground">{versionCount} versions</span>
+          </div>
+          <VersionHistory
+            reportId={report.id}
+            versions={report.versions ?? []}
+            currentVersionNumber={report.versionNumber}
+            isUnderReview={report.status === "submitted"}
+          />
+        </div>
+      )}
+
       {/* Meta */}
       <div className="rounded-xl border border-[#E1E6ED] bg-[#F5F7FA] p-4 text-xs text-muted-foreground flex items-center justify-between">
         <span>Report by {report.userName}</span>
         <span>Created {formatDate(report.createdAt)} · Updated {formatDate(report.updatedAt)}</span>
       </div>
+
+      <ReviewDialog
+        key={reviewSession}
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        onReview={handleReview}
+        defaultAction={reviewDefaultAction}
+      />
 
       {confirmNode}
     </div>

@@ -44,6 +44,7 @@ export type Report = {
   weekStartDate: string;
   weekEndDate: string;
   status: ReportStatus;
+  versionNumber: number;
   notes: string | null;
   userName: string;
   projectName: string | null;
@@ -54,6 +55,42 @@ export type Report = {
   blockers?: Blocker[];
   achievements?: Achievement[];
   hoursWorked?: HoursWorked[];
+  reviews?: ReportReview[];
+  versions?: ReportVersionMeta[];
+};
+
+export type ReviewAction = "approved" | "request_correction";
+
+export type ReportReview = {
+  id: string;
+  reportId: string;
+  reviewerId: string;
+  reviewerName: string;
+  action: ReviewAction;
+  comment: string | null;
+  versionId: string;
+  versionNumber: number;
+  createdAt: string;
+};
+
+export type ReportVersionMeta = {
+  id: string;
+  reportId: string;
+  versionNumber: number;
+  projectId: string | null;
+  weekStartDate: string;
+  weekEndDate: string;
+  notes: string | null;
+  projectName: string | null;
+  createdAt: string;
+};
+
+export type ReportVersionDetail = ReportVersionMeta & {
+  tasks: ReportTask[];
+  nextWeekTasks: NextWeekTask[];
+  blockers: Blocker[];
+  achievements: Achievement[];
+  hoursWorked: HoursWorked[];
 };
 
 export type CreateReportInput = {
@@ -104,12 +141,19 @@ export function submitReport(id: string) {
   return api.post<Report>(`/api/reports/${id}/submit`);
 }
 
-export function approveReport(id: string) {
-  return api.post<Report>(`/api/reports/${id}/approve`);
+export function reviewReport(id: string, action: ReviewAction, comment?: string) {
+  return api.post<Report>(`/api/reports/${id}/review`, {
+    action,
+    ...(comment !== undefined ? { comment } : {}),
+  });
 }
 
-export function requestCorrection(id: string) {
-  return api.post<Report>(`/api/reports/${id}/request-correction`);
+export function getReportVersions(id: string) {
+  return api.get<ReportVersionMeta[]>(`/api/reports/${id}/versions`);
+}
+
+export function getReportVersion(reportId: string, versionId: string) {
+  return api.get<ReportVersionDetail>(`/api/reports/${reportId}/versions/${versionId}`);
 }
 
 export function getProjects() {

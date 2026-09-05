@@ -8,6 +8,7 @@ import {
   updateReport,
   deleteReport,
   transitionStatus,
+  assertCanReadReport,
   listProjects,
   createProject,
   deleteProject,
@@ -26,6 +27,8 @@ export async function getAllReports(_req: Request, res: Response) {
 
 export async function getReport(req: Request, res: Response) {
   const id = req.params.id as string;
+  const authed = req as AuthedRequest;
+  await assertCanReadReport(id, authed.userId!, authed.permissions ?? []);
   const data = await getReportById(id);
   res.json({ success: true, data });
 }
@@ -54,20 +57,6 @@ export async function submitReport(req: Request, res: Response) {
   const id = req.params.id as string;
   const userId = (req as AuthedRequest).userId!;
   const data = await transitionStatus(id, userId, "submitted");
-  res.json({ success: true, data });
-}
-
-export async function approveReport(req: Request, res: Response) {
-  const id = req.params.id as string;
-  const userId = (req as AuthedRequest).userId!;
-  const data = await transitionStatus(id, userId, "approved");
-  res.json({ success: true, data });
-}
-
-export async function requestCorrectionReport(req: Request, res: Response) {
-  const id = req.params.id as string;
-  const userId = (req as AuthedRequest).userId!;
-  const data = await transitionStatus(id, userId, "needs_correction");
   res.json({ success: true, data });
 }
 

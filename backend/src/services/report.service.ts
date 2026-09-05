@@ -1,5 +1,9 @@
-import { query, insert, withTransaction, type TransactionExec } from "../config/database.js";
+import { query, insert, withTransaction, type RowDataPacket, type TransactionExec } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
+import { PERMISSIONS } from "../constants/permissions.js";
+import { listReportVersions } from "./reportVersion.service.js";
+
+export type ReportStatus = "draft" | "submitted" | "needs_correction" | "approved";
 
 type ReportRow = {
   id: string | number;
@@ -7,12 +11,21 @@ type ReportRow = {
   projectId: string | number | null;
   weekStartDate: string;
   weekEndDate: string;
-  status: "draft" | "submitted" | "needs_correction" | "approved";
+  status: ReportStatus;
+  versionNumber: number;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
   userName: string;
   projectName: string | null;
+};
+
+type QueryRunner = {
+  rows: <T extends RowDataPacket[]>(sql: string, params?: unknown[]) => Promise<T>;
+};
+
+const defaultRunner: QueryRunner = {
+  rows: <T extends RowDataPacket[]>(sql: string, params?: unknown[]) => query<T>(sql, params),
 };
 
 type TaskRow = {
@@ -76,7 +89,13 @@ function toDateString(value: unknown): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function toDateParam(value: string): string {
+function toDateParam(value: string | Date): string {
+  if (value instanceof Date) {
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
   return value.slice(0, 10);
 }
 
@@ -151,6 +170,7 @@ function mapReport(row: ReportRow) {
     weekStartDate: toDateString(row.weekStartDate),
     weekEndDate: toDateString(row.weekEndDate),
     status: row.status,
+    versionNumber: Number(row.versionNumber ?? 0),
     notes: row.notes,
     userName: row.userName,
     projectName: row.projectName,
@@ -159,23 +179,14 @@ function mapReport(row: ReportRow) {
   };
 }
 
-async function getTasksByReportId(reportId: string | number) {
-  const rows = (await query(
+async function getTasksByReportId(reportId: string | number, runner: QueryRunner = defaultRunner) {
+  const rows = (await runner.rows(
     `SELECT taskName, priority, plannedPercent, actualPercent, status, timePlanned, timeSpent, deliverable, sortOrder
      FROM ReportTask WHERE reportId = ? ORDER BY sortOrder ASC`,
     [reportId]
   )) as TaskRow[];
   return rows.map((r) => {
-    const task: {
-      taskName: string;
-      priority: string;
-      plannedPercent: number;
-      actualPercent: number;
-      status: string;
-      timePlanned?: number;
-      timeSpent?: number;
-      deliverable?: string;
-    } = {
+    const task: CreateTaskInput = {
       taskName: r.taskName,
       priority: r.priority,
       plannedPercent: r.plannedPercent,
@@ -189,8 +200,8 @@ async function getTasksByReportId(reportId: string | number) {
   });
 }
 
-async function getNextWeekTasksByReportId(reportId: string | number): Promise<CreateNextWeekTaskInput[]> {
-  const rows = (await query(
+async function getNextWeekTasksByReportId(reportId: string | number, runner: QueryRunner = defaultRunner): Promise<CreateNextWeekTaskInput[]> {
+  const rows = (await runner.rows(
     `SELECT taskName, priority, status, sortOrder
      FROM ReportNextWeekTask WHERE reportId = ? ORDER BY sortOrder ASC`,
     [reportId]
@@ -202,8 +213,8 @@ async function getNextWeekTasksByReportId(reportId: string | number): Promise<Cr
   }));
 }
 
-async function getBlockersByReportId(reportId: string | number): Promise<CreateBlockerInput[]> {
-  const rows = (await query(
+async function getBlockersByReportId(reportId: string | number, runner: QueryRunner = defaultRunner): Promise<CreateBlockerInput[]> {
+  const rows = (await runner.rows(
     `SELECT description, isKeyIssue FROM ReportBlocker WHERE reportId = ?`,
     [reportId]
   )) as BlockerRow[];
@@ -213,8 +224,8 @@ async function getBlockersByReportId(reportId: string | number): Promise<CreateB
   }));
 }
 
-async function getAchievementsByReportId(reportId: string | number): Promise<CreateAchievementInput[]> {
-  const rows = (await query(
+async function getAchievementsByReportId(reportId: string | number, runner: QueryRunner = defaultRunner): Promise<CreateAchievementInput[]> {
+  const rows = (await runner.rows(
     `SELECT description, isKeyAchievement FROM ReportAchievement WHERE reportId = ?`,
     [reportId]
   )) as AchievementRow[];
@@ -224,8 +235,8 @@ async function getAchievementsByReportId(reportId: string | number): Promise<Cre
   }));
 }
 
-async function getHoursByReportId(reportId: string | number): Promise<CreateHoursInput[]> {
-  const rows = (await query(
+async function getHoursByReportId(reportId: string | number, runner: QueryRunner = defaultRunner): Promise<CreateHoursInput[]> {
+  const rows = (await runner.rows(
     `SELECT category, hours FROM ReportHoursWorked WHERE reportId = ?`,
     [reportId]
   )) as HoursRow[];
@@ -233,6 +244,25 @@ async function getHoursByReportId(reportId: string | number): Promise<CreateHour
     category: r.category,
     hours: Number(r.hours),
   }));
+}
+
+type ReportContent = {
+  tasks: CreateTaskInput[];
+  nextWeekTasks: CreateNextWeekTaskInput[];
+  blockers: CreateBlockerInput[];
+  achievements: CreateAchievementInput[];
+  hoursWorked: CreateHoursInput[];
+};
+
+async function loadReportContent(reportId: string | number, runner: QueryRunner): Promise<ReportContent> {
+  const [tasks, nextWeekTasks, blockers, achievements, hoursWorked] = await Promise.all([
+    getTasksByReportId(reportId, runner),
+    getNextWeekTasksByReportId(reportId, runner),
+    getBlockersByReportId(reportId, runner),
+    getAchievementsByReportId(reportId, runner),
+    getHoursByReportId(reportId, runner),
+  ]);
+  return { tasks, nextWeekTasks, blockers, achievements, hoursWorked };
 }
 
 async function replaceNested(exec: TransactionExec, reportId: string | number, data: CreateReportInput) {
@@ -295,7 +325,7 @@ async function replaceNested(exec: TransactionExec, reportId: string | number, d
 
 export async function listMyReports(userId: string) {
   const rows = (await query(
-    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.notes, wr.createdAt, wr.updatedAt,
+    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.versionNumber, wr.notes, wr.createdAt, wr.updatedAt,
             u.name AS userName, p.name AS projectName
      FROM WeeklyReport wr
      LEFT JOIN User u ON u.id = wr.userId
@@ -309,7 +339,7 @@ export async function listMyReports(userId: string) {
 
 export async function listAllReports() {
   const rows = (await query(
-    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.notes, wr.createdAt, wr.updatedAt,
+    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.versionNumber, wr.notes, wr.createdAt, wr.updatedAt,
             u.name AS userName, p.name AS projectName
      FROM WeeklyReport wr
      LEFT JOIN User u ON u.id = wr.userId
@@ -321,7 +351,7 @@ export async function listAllReports() {
 
 export async function getReportById(id: string) {
   const rows = (await query(
-    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.notes, wr.createdAt, wr.updatedAt,
+    `SELECT wr.id, wr.userId, wr.projectId, wr.weekStartDate, wr.weekEndDate, wr.status, wr.versionNumber, wr.notes, wr.createdAt, wr.updatedAt,
             u.name AS userName, p.name AS projectName
      FROM WeeklyReport wr
      LEFT JOIN User u ON u.id = wr.userId
@@ -334,15 +364,68 @@ export async function getReportById(id: string) {
     throw new ApiError(404, "Report not found.");
   }
 
-  const [tasks, nextWeekTasks, blockers, achievements, hoursWorked] = await Promise.all([
+  const [tasks, nextWeekTasks, blockers, achievements, hoursWorked, reviews, versions] = await Promise.all([
     getTasksByReportId(report.id),
     getNextWeekTasksByReportId(report.id),
     getBlockersByReportId(report.id),
     getAchievementsByReportId(report.id),
     getHoursByReportId(report.id),
+    getReviewsByReportId(report.id),
+    listReportVersions(report.id),
   ]);
 
-  return { ...mapReport(report), tasks, nextWeekTasks, blockers, achievements, hoursWorked };
+  return { ...mapReport(report), tasks, nextWeekTasks, blockers, achievements, hoursWorked, reviews, versions };
+}
+
+type ReviewRow = {
+  id: string | number;
+  reportId: string | number;
+  reviewerId: string | number;
+  reviewerName: string;
+  action: "approved" | "request_correction";
+  comment: string | null;
+  versionId: string | number;
+  versionNumber: number;
+  createdAt: Date;
+};
+
+async function getReviewsByReportId(reportId: string | number) {
+  const rows = (await query(
+    `SELECT rv.id, rv.reportId, rv.reviewerId, rv.action, rv.comment, rv.createdAt,
+            rv.versionId, v.versionNumber, u.name AS reviewerName
+     FROM ReportReview rv
+     LEFT JOIN ReportVersion v ON v.id = rv.versionId
+     LEFT JOIN User u ON u.id = rv.reviewerId
+     WHERE rv.reportId = ?
+     ORDER BY rv.createdAt DESC, rv.id DESC`,
+    [reportId]
+  )) as ReviewRow[];
+  return rows.map((r) => ({
+    id: toId(r.id),
+    reportId: toId(r.reportId),
+    reviewerId: toId(r.reviewerId),
+    reviewerName: r.reviewerName,
+    action: r.action,
+    comment: r.comment,
+    versionId: toId(r.versionId),
+    versionNumber: Number(r.versionNumber ?? 0),
+    createdAt: r.createdAt,
+  }));
+}
+
+export async function assertCanReadReport(id: string, viewerId: string, permissions: string[]) {
+  const rows = (await query(
+    `SELECT id, userId FROM WeeklyReport WHERE id = ? LIMIT 1`,
+    [id]
+  )) as { id: string | number; userId: string | number }[];
+  const report = rows[0];
+  if (!report) {
+    throw new ApiError(404, "Report not found.");
+  }
+  const canViewAll = permissions.includes(PERMISSIONS.REPORT_VIEW_ALL);
+  if (String(report.userId) !== viewerId && !canViewAll) {
+    throw new ApiError(403, "You can only view your own reports.");
+  }
 }
 
 export async function createReport(userId: string, data: CreateReportInput) {
@@ -407,10 +490,24 @@ export async function deleteReport(id: string, userId: string) {
 }
 
 export async function transitionStatus(id: string, userId: string, newStatus: string) {
+  if (newStatus !== "submitted") {
+    throw new ApiError(400, "Only the submit transition is supported here.");
+  }
+
   const existing = (await query(
-    `SELECT id, userId, status FROM WeeklyReport WHERE id = ? LIMIT 1`,
+    `SELECT id, userId, status, versionNumber, projectId, weekStartDate, weekEndDate, notes
+     FROM WeeklyReport WHERE id = ? LIMIT 1`,
     [id]
-  )) as { id: string | number; userId: string | number; status: string }[];
+  )) as {
+    id: string | number;
+    userId: string | number;
+    status: string;
+    versionNumber: number;
+    projectId: string | number | null;
+    weekStartDate: string;
+    weekEndDate: string;
+    notes: string | null;
+  }[];
   const report = existing[0];
   if (!report) {
     throw new ApiError(404, "Report not found.");
@@ -421,11 +518,39 @@ export async function transitionStatus(id: string, userId: string, newStatus: st
     throw new ApiError(400, `Cannot transition from "${report.status}" to "${newStatus}".`);
   }
 
-  if (newStatus === "submitted" && String(report.userId) !== userId) {
+  if (String(report.userId) !== userId) {
     throw new ApiError(403, "You can only submit your own reports.");
   }
 
-  await query(`UPDATE WeeklyReport SET status = ?, updatedAt = NOW() WHERE id = ?`, [newStatus, id]);
+  await withTransaction(async (exec) => {
+    const versionNumber = Number(report.versionNumber ?? 0) + 1;
+    const content = await loadReportContent(id, exec);
+
+    await exec.run(
+      `UPDATE WeeklyReport SET status = ?, versionNumber = ?, updatedAt = NOW() WHERE id = ?`,
+      [newStatus, versionNumber, id]
+    );
+
+    await exec.run(
+      `INSERT INTO ReportVersion (reportId, versionNumber, projectId, weekStartDate, weekEndDate, notes,
+                                  tasks, nextWeekTasks, blockers, achievements, hoursWorked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        versionNumber,
+        report.projectId ?? null,
+        toDateParam(report.weekStartDate),
+        toDateParam(report.weekEndDate),
+        report.notes ?? null,
+        JSON.stringify(content.tasks),
+        JSON.stringify(content.nextWeekTasks),
+        JSON.stringify(content.blockers),
+        JSON.stringify(content.achievements),
+        JSON.stringify(content.hoursWorked),
+      ]
+    );
+  });
+
   return getReportById(id);
 }
 

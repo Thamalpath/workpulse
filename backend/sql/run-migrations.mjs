@@ -21,6 +21,7 @@ async function main() {
     user,
     password,
     database,
+    multipleStatements: true,
   });
   console.log(`Connected to ${database}`);
 
@@ -28,6 +29,8 @@ async function main() {
     .readdirSync(__dirname)
     .filter((f) => f.endsWith(".sql"))
     .sort();
+
+  await connection.query("SET FOREIGN_KEY_CHECKS = 0");
 
   for (const file of sqlFiles) {
     const sql = fs.readFileSync(path.join(__dirname, file), "utf8");
@@ -42,6 +45,7 @@ async function main() {
     }
   }
 
+  await connection.query("SET FOREIGN_KEY_CHECKS = 1");
   await connection.end();
   console.log("Migration complete.");
 }
