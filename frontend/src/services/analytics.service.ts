@@ -47,7 +47,6 @@ export type MemberStatusPoint = {
 export type ProjectWorkloadPoint = {
   projectId: string | null;
   projectName: string;
-  projectKey: string;
   taskCount: number;
   completedTasks: number;
   totalHours: number;

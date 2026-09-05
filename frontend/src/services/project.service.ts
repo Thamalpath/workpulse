@@ -3,7 +3,6 @@ import { api } from "@/lib/api";
 export type Project = {
   id: string;
   name: string;
-  key: string;
   description: string | null;
   isActive: boolean;
   createdAt?: string;
@@ -24,13 +23,11 @@ export type ProjectDetail = Project & {
 
 export type CreateProjectInput = {
   name: string;
-  key: string;
   description?: string;
 };
 
 export type UpdateProjectInput = {
   name?: string;
-  key?: string;
   description?: string;
   isActive?: boolean;
 };
@@ -53,6 +50,10 @@ export function updateProject(id: string, data: UpdateProjectInput) {
 
 export function archiveProject(id: string) {
   return api.delete(`/api/projects/${id}`);
+}
+
+export function deleteProject(id: string) {
+  return api.delete(`/api/projects/${id}/permanent`);
 }
 
 export function setProjectMembers(id: string, userIds: string[]) {
