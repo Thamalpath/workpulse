@@ -27,6 +27,32 @@ export async function getRoles(req: Request, res: Response) {
   res.json({ success: true, data });
 }
 
+export async function getAssignments(req: Request, res: Response) {
+  const hiddenKeys = isAdminAuthed(req)
+    ? []
+    : Array.from(new Set(["admin", ...callerRoles(req)]));
+  const [roles, permissions] = await Promise.all([
+    listRoles({ hideRoleKeys: hiddenKeys }),
+    listPermissions(),
+  ]);
+  res.json({ success: true, data: { roles, permissions } });
+}
+
+export async function patchRolePermissions(req: Request, res: Response) {
+  const id = req.params.id as string;
+  const { permissionIds } = req.body as { permissionIds: string[] };
+
+  if (!isAdminAuthed(req)) {
+    const current = await getRoleById(id);
+    if (callerRoles(req).includes(current.key)) {
+      throw new ApiError(403, "You cannot modify your own role.");
+    }
+  }
+
+  const role = await updateRole(id, { permissionIds });
+  res.json({ success: true, data: role });
+}
+
 export async function getRole(req: Request, res: Response) {
   const id = req.params.id as string;
   const data = await getRoleById(id);

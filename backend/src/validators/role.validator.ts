@@ -27,3 +27,10 @@ export const validateUpdateRole = validateBody({
   description: { optional: true, isString: true },
   permissionIds: { optional: true, isStringArray: true },
 });
+
+export const validateRolePermissions = validateBody({
+  permissionIds: {
+    isStringArray: true,
+    message: "permissionIds must be an array of permission ids.",
+  },
+});
