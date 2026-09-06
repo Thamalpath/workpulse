@@ -1,11 +1,6 @@
 # WorkPulse
 
 WorkPulse is a weekly team reporting and analytics platform. It has:
-<<<<<<< HEAD
-
-=======
-
-> > > > > > > 0bbfb68b086e9df9f62222a2a1860ae2ed7d64cf
 
 - **Frontend** — Next.js (App Router) + React 19 + Tailwind CSS 4, `frontend/`
 - **Backend** — Express + TypeScript REST API, `backend/`
