@@ -26,7 +26,6 @@ CREATE TABLE `Role` (
     `name` VARCHAR(191) NOT NULL,
     `key` VARCHAR(191) NOT NULL,
     `description` VARCHAR(191) NULL,
-    `isSystem` BOOLEAN NOT NULL DEFAULT false,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     UNIQUE INDEX `Role_key_key`(`key`),

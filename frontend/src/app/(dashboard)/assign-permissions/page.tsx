@@ -10,8 +10,6 @@ import {
   ShieldCheck,
   UserCog,
 } from "lucide-react";
-
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FullPageLoader } from "@/components/loader";
@@ -66,7 +64,7 @@ export default function RolePermissionsPage() {
 
   const selectedRole = useMemo(
     () => roles.find((role) => role.id === selectedRoleId) ?? null,
-    [roles, selectedRoleId]
+    [roles, selectedRoleId],
   );
 
   // Sync the working selection whenever the selected role changes.
@@ -80,7 +78,7 @@ export default function RolePermissionsPage() {
 
   const originalPermIds = useMemo(
     () => new Set((selectedRole?.permissions ?? []).map((p) => p.id)),
-    [selectedRole]
+    [selectedRole],
   );
   const isDirty =
     selectedPerms.size !== originalPermIds.size ||
@@ -88,7 +86,7 @@ export default function RolePermissionsPage() {
 
   const groupedPermissions = useMemo(
     () => groupPermissions(permissionList),
-    [permissionList]
+    [permissionList],
   );
 
   const locked = !!selectedRole && selectedRole.key === "admin";
@@ -126,7 +124,7 @@ export default function RolePermissionsPage() {
     setSelectedPerms((prev) =>
       prev.size === permissionList.length
         ? new Set()
-        : new Set(permissionList.map((p) => p.id))
+        : new Set(permissionList.map((p) => p.id)),
     );
   }
 
@@ -145,7 +143,9 @@ export default function RolePermissionsPage() {
         setSelectedPerms(new Set(updated.permissions.map((p) => p.id)));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update permissions.");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update permissions.",
+      );
     } finally {
       setSaving(false);
     }
@@ -195,17 +195,28 @@ export default function RolePermissionsPage() {
                     "flex w-full flex-col gap-1 rounded-lg px-3 py-2.5 text-left transition-colors",
                     selected
                       ? "bg-[#4263A3] text-white"
-                      : "text-[#18202F] hover:bg-[#E1E6ED]/60"
+                      : "text-[#18202F] hover:bg-[#E1E6ED]/60",
                   )}
                 >
                   <span className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{role.name}</span>
                     {role.key === "admin" && (
-                      <Lock className={cn("size-3.5", selected ? "text-white/80" : "text-[#2F6B5C]")} />
+                      <Lock
+                        className={cn(
+                          "size-3.5",
+                          selected ? "text-white/80" : "text-[#2F6B5C]",
+                        )}
+                      />
                     )}
                   </span>
-                  <span className={cn("text-xs", selected ? "text-white/80" : "text-muted-foreground")}>
-                    {role.key} · {role.permissions.length} permissions · {role.userCount} member{role.userCount === 1 ? "" : "s"}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      selected ? "text-white/80" : "text-muted-foreground",
+                    )}
+                  >
+                    {role.key} · {role.permissions.length} permissions ·{" "}
+                    {role.userCount} member{role.userCount === 1 ? "" : "s"}
                   </span>
                 </button>
               );
@@ -229,15 +240,17 @@ export default function RolePermissionsPage() {
                   <h2 className="text-base font-semibold text-[#18202F]">
                     {selectedRole.name}
                   </h2>
-                  <Badge variant={selectedRole.isSystem ? "default" : "secondary"}>
-                    {selectedRole.isSystem ? "System" : "Custom"}
-                  </Badge>
                 </div>
                 {canAssign && (
                   <div className="flex items-center gap-2">
                     {!locked && (
                       <>
-                        <Button type="button" size="sm" variant="outline" onClick={toggleAll}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={toggleAll}
+                        >
                           <CheckCheck />
                           {selectedPerms.size === permissionList.length
                             ? "Clear all"
@@ -250,7 +263,11 @@ export default function RolePermissionsPage() {
                           onClick={handleSave}
                           disabled={saving || !isDirty}
                         >
-                          {saving ? <Loader2 className="size-4 animate-spin" /> : <Save />}
+                          {saving ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Save />
+                          )}
                           Save changes
                         </Button>
                       </>
@@ -278,7 +295,8 @@ export default function RolePermissionsPage() {
               <div className="px-5 py-4">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-xs text-muted-foreground">
-                    {selectedPerms.size} of {permissionList.length} permissions selected
+                    {selectedPerms.size} of {permissionList.length} permissions
+                    selected
                   </p>
                   {!locked && (
                     <Button
@@ -295,7 +313,9 @@ export default function RolePermissionsPage() {
 
                 <div className="grid gap-4 lg:grid-cols-2">
                   {groupedPermissions.map(([module, list]) => {
-                    const selectedCount = list.filter((p) => selectedPerms.has(p.id)).length;
+                    const selectedCount = list.filter((p) =>
+                      selectedPerms.has(p.id),
+                    ).length;
                     const allChecked = selectedCount === list.length;
                     return (
                       <div
@@ -307,7 +327,9 @@ export default function RolePermissionsPage() {
                             {!locked && (
                               <Checkbox
                                 checked={allChecked}
-                                onCheckedChange={() => toggleModule(module, list)}
+                                onCheckedChange={() =>
+                                  toggleModule(module, list)
+                                }
                                 aria-label={`Select all in ${module}`}
                               />
                             )}
@@ -325,14 +347,20 @@ export default function RolePermissionsPage() {
                               key={permission.id}
                               className={cn(
                                 "flex items-start gap-2 rounded-md px-1 py-1 text-sm",
-                                locked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-[#F5F7FA]"
+                                locked
+                                  ? "cursor-not-allowed opacity-60"
+                                  : "cursor-pointer hover:bg-[#F5F7FA]",
                               )}
                             >
                               <Checkbox
                                 checked={
-                                  locked ? true : selectedPerms.has(permission.id)
+                                  locked
+                                    ? true
+                                    : selectedPerms.has(permission.id)
                                 }
-                                onCheckedChange={() => togglePermission(permission.id)}
+                                onCheckedChange={() =>
+                                  togglePermission(permission.id)
+                                }
                                 disabled={locked}
                               />
                               <span>

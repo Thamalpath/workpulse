@@ -16,7 +16,6 @@ export type ManagedRole = {
   key: string;
   name: string;
   description: string | null;
-  isSystem: boolean;
   userCount: number;
   permissions: Permission[];
 };

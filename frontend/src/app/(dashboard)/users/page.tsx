@@ -865,7 +865,6 @@ export default function UsersPage() {
                     <TableHead>Key</TableHead>
                     <TableHead>Permissions</TableHead>
                     <TableHead>Members</TableHead>
-                    <TableHead>System</TableHead>
                     {(canUpdateRoles || canDeleteRoles) && (
                       <TableHead className="text-right">Actions</TableHead>
                     )}
@@ -893,17 +892,10 @@ export default function UsersPage() {
                       <TableCell className="text-muted-foreground">
                         {role.userCount}
                       </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={role.isSystem ? "default" : "secondary"}
-                        >
-                          {role.isSystem ? "System" : "Custom"}
-                        </Badge>
-                      </TableCell>
                       {(canUpdateRoles || canDeleteRoles) && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {canUpdateRoles && !role.isSystem && (
+                            {canUpdateRoles && (
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -915,7 +907,7 @@ export default function UsersPage() {
                                 <Pencil />
                               </Button>
                             )}
-                            {canDeleteRoles && !role.isSystem && (
+                            {canDeleteRoles && (
                               <Button
                                 variant="ghostDestructive"
                                 size="icon"

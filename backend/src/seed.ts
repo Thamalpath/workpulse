@@ -4,10 +4,19 @@ import { insert, pool, query } from "./config/database.js";
 import { SEED_PERMISSIONS, SEED_ROLES } from "./constants/permissions.js";
 
 const SEED_PROJECTS = [
-  { name: "Atlas CRM", description: "Customer relationship management platform" },
-  { name: "Nimbus Analytics", description: "Real-time analytics dashboard suite" },
+  {
+    name: "Atlas CRM",
+    description: "Customer relationship management platform",
+  },
+  {
+    name: "Nimbus Analytics",
+    description: "Real-time analytics dashboard suite",
+  },
   { name: "Orion Mobile App", description: "Mobile companion application" },
-  { name: "WorkPulse Platform", description: "Internal weekly reporting platform" },
+  {
+    name: "WorkPulse Platform",
+    description: "Internal weekly reporting platform",
+  },
 ];
 
 async function seed() {
@@ -16,19 +25,19 @@ async function seed() {
   for (const perm of SEED_PERMISSIONS) {
     const existing = (await query(
       `SELECT id FROM Permission WHERE \`key\` = ? LIMIT 1`,
-      [perm.key]
+      [perm.key],
     )) as { id: string | number }[];
 
     if (existing[0]) {
       await query(
         `UPDATE Permission SET name = ?, module = ?, description = ?, updatedAt = NOW() WHERE id = ?`,
-        [perm.name, perm.module, perm.description, existing[0].id]
+        [perm.name, perm.module, perm.description, existing[0].id],
       );
       permissionIds[perm.key] = String(existing[0].id);
     } else {
       const id = await insert(
         `INSERT INTO Permission (name, \`key\`, description, module) VALUES (?, ?, ?, ?)`,
-        [perm.name, perm.key, perm.description, perm.module]
+        [perm.name, perm.key, perm.description, perm.module],
       );
       permissionIds[perm.key] = String(id);
     }
@@ -38,23 +47,23 @@ async function seed() {
   for (const role of SEED_ROLES) {
     const existing = (await query(
       `SELECT id FROM Role WHERE \`key\` = ? LIMIT 1`,
-      [role.key]
+      [role.key],
     )) as { id: string | number }[];
 
     if (existing[0]) {
       await query(
-        `UPDATE Role SET name = ?, description = ?, isSystem = ?, updatedAt = NOW() WHERE id = ?`,
-        [role.name, role.description, 1, existing[0].id]
+        `UPDATE Role SET name = ?, description = ?, updatedAt = NOW() WHERE id = ?`,
+        [role.name, role.description, existing[0].id],
       );
     } else {
       const id = await insert(
-        `INSERT INTO Role (name, \`key\`, description, isSystem) VALUES (?, ?, ?, ?)`,
-        [role.name, role.key, role.description, 1]
+        `INSERT INTO Role (name, \`key\`, description) VALUES (?, ?, ?)`,
+        [role.name, role.key, role.description],
       );
       for (const key of role.permissionKeys) {
         await query(
           `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
-          [id, permissionIds[key]!]
+          [id, permissionIds[key]!],
         );
       }
     }
@@ -64,7 +73,7 @@ async function seed() {
   for (const role of SEED_ROLES) {
     const roleRows = (await query(
       `SELECT id FROM Role WHERE \`key\` = ? LIMIT 1`,
-      [role.key]
+      [role.key],
     )) as { id: string | number }[];
     const roleId = roleRows[0]?.id;
     if (!roleId) {
@@ -72,7 +81,7 @@ async function seed() {
     }
     const countRows = (await query(
       `SELECT COUNT(*) AS count FROM RolePermission WHERE roleId = ?`,
-      [roleId]
+      [roleId],
     )) as { count: number }[];
     const permissionCount = Number(countRows[0]?.count ?? 0);
 
@@ -81,7 +90,7 @@ async function seed() {
       for (const key of role.permissionKeys) {
         await query(
           `INSERT INTO RolePermission (roleId, permissionId) VALUES (?, ?)`,
-          [roleId, permissionIds[key]!]
+          [roleId, permissionIds[key]!],
         );
       }
     }
@@ -93,18 +102,20 @@ async function seed() {
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "1234";
 
   const adminRoleRows = (await query(
-    `SELECT id FROM Role WHERE \`key\` = 'admin' LIMIT 1`
+    `SELECT id FROM Role WHERE \`key\` = 'admin' LIMIT 1`,
   )) as { id: string | number }[];
   const adminRoleId = adminRoleRows[0]?.id;
 
   const existingAdminRows = (await query(
     `SELECT id FROM User WHERE email = ? LIMIT 1`,
-    [adminEmail]
+    [adminEmail],
   )) as { id: string | number }[];
 
   if (existingAdminRows[0]) {
     if (adminRoleId) {
-      await query(`DELETE FROM UserRole WHERE userId = ?`, [existingAdminRows[0].id]);
+      await query(`DELETE FROM UserRole WHERE userId = ?`, [
+        existingAdminRows[0].id,
+      ]);
       await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [
         existingAdminRows[0].id,
         adminRoleId,
@@ -116,9 +127,12 @@ async function seed() {
     const id = await insert(
       `INSERT INTO User (name, email, username, password, isActive)
        VALUES (?, ?, ?, ?, ?)`,
-      ["Admin", adminEmail, adminUsername, hashed, 1]
+      ["Admin", adminEmail, adminUsername, hashed, 1],
     );
-    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [id, adminRoleId]);
+    await query(`INSERT INTO UserRole (userId, roleId) VALUES (?, ?)`, [
+      id,
+      adminRoleId,
+    ]);
     console.log("Admin user created.");
   }
 
@@ -126,18 +140,18 @@ async function seed() {
   for (const proj of SEED_PROJECTS) {
     const existing = (await query(
       `SELECT id FROM Project WHERE name = ? LIMIT 1`,
-      [proj.name]
+      [proj.name],
     )) as { id: string | number }[];
 
     if (existing[0]) {
       await query(
         `UPDATE Project SET name = ?, description = ?, isActive = 1, updatedAt = NOW() WHERE id = ?`,
-        [proj.name, proj.description, existing[0].id]
+        [proj.name, proj.description, existing[0].id],
       );
     } else {
       await insert(
         `INSERT INTO Project (name, description, isActive) VALUES (?, ?, 1)`,
-        [proj.name, proj.description]
+        [proj.name, proj.description],
       );
     }
   }
