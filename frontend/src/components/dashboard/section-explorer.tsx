@@ -93,7 +93,7 @@ function TaskItems({ items }: { items: unknown[] }) {
                   TASK_STATUS_COLORS[task.status] ?? "bg-gray-100 text-gray-600",
                 )}
               >
-                {task.status.replace("_", " ")}
+                {task.status?.replace("_", " ")}
               </span>
               <span>Act: {task.actualPercent}% · Plan: {task.plannedPercent}%</span>
               {(task.timePlanned != null || task.timeSpent != null) && (
@@ -140,7 +140,7 @@ function NextWeekTaskItems({ items }: { items: unknown[] }) {
                 TASK_STATUS_COLORS[row.status] ?? "bg-gray-100 text-gray-600",
               )}
             >
-              {row.status.replace("_", " ")}
+              {row.status?.replace("_", " ")}
             </span>
           </div>
         </li>
