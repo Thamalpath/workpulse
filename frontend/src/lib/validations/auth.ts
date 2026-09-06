@@ -21,7 +21,7 @@ export const registerSchema = z
     password: z
       .string()
       .min(1, "Password is required.")
-      .min(4, "Password must be at least 4 characters."),
+      .min(6, "Password must be at least 6 characters."),
     confirmPassword: z.string().min(1, "Please confirm your password."),
   })
   .refine((data) => data.password === data.confirmPassword, {
