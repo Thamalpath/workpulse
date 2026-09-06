@@ -45,12 +45,19 @@ export default function RolePermissionsPage() {
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const fetchedOnce = useRef(false);
+  const fetchInFlight = useRef(false);
 
   const refresh = useCallback(async () => {
-    const data = await getAssignments();
-    setRoles(data.roles);
-    setPermissionList(data.permissions);
-    return data.roles;
+    if (fetchInFlight.current) return [];
+    fetchInFlight.current = true;
+    try {
+      const data = await getAssignments();
+      setRoles(data.roles);
+      setPermissionList(data.permissions);
+      return data.roles;
+    } finally {
+      fetchInFlight.current = false;
+    }
   }, []);
 
   useEffect(() => {
