@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -67,6 +67,7 @@ export default function ReportsPage() {
   const [reviewTarget, setReviewTarget] = useState<Report | null>(null);
   const router = useRouter();
   const [confirm, confirmNode] = useConfirm();
+  const initialFetchRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -78,6 +79,9 @@ export default function ReportsPage() {
   }, [canViewAll]);
 
   useEffect(() => {
+    if (initialFetchRef.current) return;
+    initialFetchRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     void refresh()
       .catch(() => undefined)
       .finally(() => setLoading(false));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -165,6 +165,8 @@ export default function DashboardPage() {
   const [categories, setCategories] = useState<string[]>([...DEFAULT_HOURS_CATEGORIES]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const fetchInFlight = useRef(false);
+  const auxFetchedRef = useRef(false);
 
   // Filter state
   const [memberFilter, setMemberFilter] = useState<string>("all");
@@ -182,6 +184,8 @@ export default function DashboardPage() {
 
   const loadData = useCallback(
     async (isSilent = false) => {
+      if (fetchInFlight.current) return;
+      fetchInFlight.current = true;
       if (!isSilent) setRefreshing(true);
       try {
         const data = await getTeamWeekly({
@@ -196,6 +200,7 @@ export default function DashboardPage() {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        fetchInFlight.current = false;
       }
     },
     [startDate, endDate, projectFilter, categoryFilter],
@@ -206,6 +211,8 @@ export default function DashboardPage() {
   }, [loadData]);
 
   useEffect(() => {
+    if (auxFetchedRef.current) return;
+    auxFetchedRef.current = true;
     void getProjects()
       .then(setProjects)
       .catch(() => setProjects([]));

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -66,6 +66,8 @@ export default function InsightsPage() {
   const [members, setMembers] = useState<TeamRosterMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const fetchInFlight = useRef(false);
+  const auxFetchedRef = useRef(false);
 
   // Inspection modal
   const [inspectedReportId, setInspectedReportId] = useState<string | null>(null);
@@ -73,6 +75,8 @@ export default function InsightsPage() {
 
   const fetchOverview = useCallback(
     async (isSilent = false) => {
+      if (fetchInFlight.current) return;
+      fetchInFlight.current = true;
       if (!isSilent) setRefreshing(true);
       try {
         const data = await getAnalyticsOverview({
@@ -87,6 +91,7 @@ export default function InsightsPage() {
       } finally {
         setLoading(false);
         setRefreshing(false);
+        fetchInFlight.current = false;
       }
     },
     [startDate, endDate, projectFilter, memberFilter],
@@ -97,6 +102,8 @@ export default function InsightsPage() {
   }, [fetchOverview]);
 
   useEffect(() => {
+    if (auxFetchedRef.current) return;
+    auxFetchedRef.current = true;
     void getProjects()
       .then(setProjects)
       .catch(() => setProjects([]));
