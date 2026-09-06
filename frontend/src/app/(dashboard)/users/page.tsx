@@ -121,9 +121,9 @@ function UserDialog({
     const trimmedUsername = username.trim();
 
     if (!trimmedName) {
-      next.name = "Full name is required.";
+      next.name = "Name is required.";
     } else if (trimmedName.length < 2) {
-      next.name = "Full name must be at least 2 characters.";
+      next.name = "Name must be at least 2 characters.";
     }
 
     if (editing) {
@@ -213,7 +213,7 @@ function UserDialog({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="user-name">Full name</Label>
+              <Label htmlFor="user-name">Name</Label>
               <Input
                 id="user-name"
                 value={name}

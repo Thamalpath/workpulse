@@ -121,7 +121,7 @@ function RegisterForm() {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Full name</FormLabel>
+                    <FormLabel>Name</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Jane Cooper"
