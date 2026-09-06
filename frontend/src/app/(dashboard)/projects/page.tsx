@@ -638,6 +638,12 @@ export default function ProjectsPage() {
                           ? `${project.memberCount} member${project.memberCount === 1 ? "" : "s"}`
                           : "Unassigned"}
                       </span>
+                      {project.memberCount > 0 &&
+                        project.memberUsernames.length > 0 && (
+                          <div className="mt-0.5 max-w-[280px] truncate text-xs text-muted-foreground">
+                            @{project.memberUsernames.join("  ·  @")}
+                          </div>
+                        )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {project.reportCount}

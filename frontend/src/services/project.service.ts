@@ -7,6 +7,7 @@ export type Project = {
   isActive: boolean;
   createdAt?: string;
   memberCount: number;
+  memberUsernames: string[];
   reportCount: number;
 };
 

@@ -8,6 +8,7 @@ type ProjectRow = {
   isActive: boolean | number;
   createdAt: Date;
   memberCount: string | number;
+  memberUsernames: string | null;
   reportCount: string | number;
 };
 
@@ -38,6 +39,11 @@ function mapProject(row: ProjectRow) {
     isActive: toBoolean(row.isActive),
     createdAt: row.createdAt,
     memberCount: toCount(row.memberCount),
+    memberUsernames: row.memberUsernames
+      ? String(row.memberUsernames)
+          .split(",")
+          .map((name) => name.trim())
+      : [],
     reportCount: toCount(row.reportCount),
   };
 }
@@ -58,6 +64,10 @@ const PROJECT_COLUMNS = `
   p.isActive,
   p.createdAt,
   (SELECT COUNT(*) FROM ProjectMember pm WHERE pm.projectId = p.id) AS memberCount,
+  (SELECT GROUP_CONCAT(u.username ORDER BY u.name ASC SEPARATOR ', ')
+   FROM ProjectMember pmu
+   JOIN User u ON u.id = pmu.userId
+   WHERE pmu.projectId = p.id) AS memberUsernames,
   (SELECT COUNT(*) FROM WeeklyReport wr WHERE wr.projectId = p.id) AS reportCount
 `;
 
