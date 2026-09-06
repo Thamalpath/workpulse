@@ -3,24 +3,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
-  BarChart3,
   FilterX,
   FolderKanban,
   LayoutDashboard,
   Loader2,
   RefreshCw,
-  Search,
   Sparkles,
-  TrendingUp,
-  Users,
 } from "lucide-react";
-
 import { AnalyticsKpiCards } from "@/components/analytics/analytics-kpi-cards";
 import { CategoryTimeChart } from "@/components/analytics/category-time-chart";
 import { MemberStatusChart } from "@/components/analytics/member-status-chart";
 import { ProjectWorkloadChart } from "@/components/analytics/project-workload-chart";
-import { RecentActivityFeed } from "@/components/analytics/recent-activity-feed";
+// import { RecentActivityFeed } from "@/components/analytics/recent-activity-feed";
 import { TasksTrendChart } from "@/components/analytics/tasks-trend-chart";
 import { TeamDateFilter } from "@/components/dashboard/team-date-filter";
 import { FullPageLoader } from "@/components/loader";
@@ -41,7 +35,10 @@ import {
   type AnalyticsOverview,
 } from "@/services/analytics.service";
 import { getProjects, type Project } from "@/services/project.service";
-import { getTeamWeekly, type TeamRosterMember } from "@/services/report.service";
+import {
+  getTeamWeekly,
+  type TeamRosterMember,
+} from "@/services/report.service";
 
 export default function InsightsPage() {
   const { permissions } = useAuth();
@@ -70,7 +67,9 @@ export default function InsightsPage() {
   const auxFetchedRef = useRef(false);
 
   // Inspection modal
-  const [inspectedReportId, setInspectedReportId] = useState<string | null>(null);
+  const [inspectedReportId, setInspectedReportId] = useState<string | null>(
+    null,
+  );
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
 
   const fetchOverview = useCallback(
@@ -152,7 +151,8 @@ export default function InsightsPage() {
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
-            Data-driven intelligence on task completion velocity, submission compliance, project effort, and team blockers.
+            Data-driven intelligence on task completion velocity, submission
+            compliance, project effort, and team blockers.
           </p>
         </div>
 
@@ -172,10 +172,18 @@ export default function InsightsPage() {
             title="Refresh analytics data"
           >
             <RefreshCw
-              className={cn("size-4", refreshing && "animate-spin text-[#4263A3]")}
+              className={cn(
+                "size-4",
+                refreshing && "animate-spin text-[#4263A3]",
+              )}
             />
           </Button>
-          <Button variant="outline" size="sm" asChild className="h-9 gap-1.5 text-xs font-medium">
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            className="h-9 gap-1.5 text-xs font-medium"
+          >
             <Link href="/dashboard">
               <LayoutDashboard className="size-3.5 text-[#4263A3]" />
               Operational Roster
@@ -234,7 +242,8 @@ export default function InsightsPage() {
         </div>
 
         <span className="text-xs font-medium text-muted-foreground">
-          Analytics period: <span className="font-bold text-[#18202F]">{rangeText}</span>
+          Analytics period:{" "}
+          <span className="font-bold text-[#18202F]">{rangeText}</span>
         </span>
       </div>
 
@@ -261,10 +270,10 @@ export default function InsightsPage() {
           </div>
 
           {/* Activity Feed */}
-          <RecentActivityFeed
+          {/* <RecentActivityFeed
             activities={overview.recentActivity}
             onInspectReport={handleOpenReport}
-          />
+          /> */}
         </>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-[#E1E6ED] bg-white py-20 text-center">

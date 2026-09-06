@@ -319,6 +319,13 @@ async function fetchMemberStatusDistribution(
   }
 
   // 2. Query reports and tasks for this period
+  const subClause = ["wr2.weekStartDate BETWEEN ? AND ?"];
+  const subParams: unknown[] = [from, to];
+  if (projectId) {
+    subClause.push("wr2.projectId = ?");
+    subParams.push(projectId);
+  }
+  const subSql = subClause.join(" AND ");
   const rows = (await query(
     `SELECT
        wr.userId,
@@ -328,15 +335,15 @@ async function fetchMemberStatusDistribution(
        SUM(CASE WHEN wr.status = 'draft' THEN 1 ELSE 0 END) as draftCount,
        COUNT(DISTINCT wr.id) as totalReports,
        (SELECT COUNT(*) FROM ReportTask rt WHERE rt.reportId IN (
-          SELECT id FROM WeeklyReport wr2 WHERE wr2.userId = wr.userId AND ${where.join(" AND ")}
+          SELECT id FROM WeeklyReport wr2 WHERE wr2.userId = wr.userId AND ${subSql}
         ) AND rt.status = 'completed') as completedTasks,
        (SELECT COALESCE(SUM(rh.hours), 0) FROM ReportHoursWorked rh WHERE rh.reportId IN (
-          SELECT id FROM WeeklyReport wr3 WHERE wr3.userId = wr.userId AND ${where.join(" AND ")}
+          SELECT id FROM WeeklyReport wr2 WHERE wr2.userId = wr.userId AND ${subSql}
         )) as totalHours
      FROM WeeklyReport wr
      WHERE ${where.join(" AND ")}
      GROUP BY wr.userId`,
-    [...params, ...params, ...params],
+    [...params, ...subParams, ...subParams],
   )) as Record<string, unknown>[];
 
   const map = new Map<string, Record<string, unknown>>();
@@ -463,6 +470,7 @@ async function fetchTimeSpentByCategory(
 }
 
 async function fetchRecentActivity(limit = 20): Promise<ActivityItem[]> {
+  const safeLimit = Math.max(1, Math.floor(Number(limit) || 20));
   // Fetch recent review actions
   const reviewRows = (await query(
     `SELECT
@@ -482,8 +490,8 @@ async function fetchRecentActivity(limit = 20): Promise<ActivityItem[]> {
      JOIN User targetUser ON targetUser.id = wr.userId
      LEFT JOIN Project p ON p.id = wr.projectId
      ORDER BY rr.createdAt DESC
-     LIMIT ?`,
-    [limit],
+     LIMIT ${safeLimit}`,
+    [],
   )) as Record<string, unknown>[];
 
   // Fetch recent submissions
@@ -504,8 +512,8 @@ async function fetchRecentActivity(limit = 20): Promise<ActivityItem[]> {
      LEFT JOIN Project p ON p.id = wr.projectId
      WHERE wr.status = 'submitted'
      ORDER BY wr.updatedAt DESC
-     LIMIT ?`,
-    [limit],
+     LIMIT ${safeLimit}`,
+    [],
   )) as Record<string, unknown>[];
 
   const combined = [...reviewRows, ...submissionRows].map((r) => ({
