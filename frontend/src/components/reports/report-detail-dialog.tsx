@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -194,15 +193,14 @@ export function ReportDetailDialog({
                   <span className="rounded-full bg-white border border-[#E1E6ED] px-2 py-0.5 text-xs font-medium text-[#38404F]">
                     v{report.versionNumber}
                   </span>
-                  <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-[#4263A3]">
-                    <Link
-                      href={`/reports/${encodeId(report.id)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Full Page <ExternalLink className="ml-1 size-3" />
-                    </Link>
-                  </Button>
+                  <a
+                    href={`/reports/${encodeId(report.id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-[#4263A3] transition-colors hover:bg-[#4263A3]/10"
+                  >
+                    Full Page <ExternalLink className="ml-1 size-3" />
+                  </a>
                 </div>
               </div>
 
