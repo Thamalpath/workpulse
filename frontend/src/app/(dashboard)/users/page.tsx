@@ -875,11 +875,6 @@ export default function UsersPage() {
                     <TableRow key={role.id}>
                       <TableCell className="font-medium text-[#18202F]">
                         {role.name}
-                        {role.description && (
-                          <p className="text-xs text-muted-foreground">
-                            {role.description}
-                          </p>
-                        )}
                       </TableCell>
                       <TableCell>
                         <code className="rounded bg-[#F5F7FA] px-1.5 py-0.5 text-xs text-[#596273]">
