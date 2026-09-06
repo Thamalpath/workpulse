@@ -14,7 +14,6 @@ export type NavLeaf = {
   label: string;
   href: string;
   icon: LucideIcon;
-  /** Required permission key; omitted means always visible to authenticated users. */
   permission?: string;
 };
 
