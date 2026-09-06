@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -73,6 +74,7 @@ export default function ReportDetailPage({
       setReport(data);
     } catch {
       setError("Report not found.");
+      toast.error("Report not found.");
     } finally {
       setLoading(false);
     }
@@ -85,18 +87,31 @@ export default function ReportDetailPage({
   async function handleSubmit() {
     if (!report) return;
     if (!(await confirm({ title: "Submit report", message: "Submit this report for review?" }))) return;
+    const resubmitting = report.status === "needs_correction";
     try {
       await submitReport(report.id);
       await fetchReport();
+      toast.success(resubmitting ? "Report resubmitted." : "Report submitted for review.");
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to submit.");
+      toast.error(err instanceof Error ? err.message : "Failed to submit report.");
     }
   }
 
   async function handleReview(action: ReviewAction, comment: string) {
     if (!report) return;
-    await reviewReport(report.id, action, comment);
-    await fetchReport();
+    try {
+      await reviewReport(report.id, action, comment);
+      await fetchReport();
+      toast.success(
+        action === "approved"
+          ? "Report approved."
+          : action === "request_correction"
+            ? "Changes requested."
+            : "Report reviewed.",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save review.");
+    }
   }
 
   function openReview(action: ReviewAction) {

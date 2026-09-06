@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -211,7 +212,6 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
   ]);
 
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FormFieldErrors>({});
   const [loading, setLoading] = useState(true);
 
@@ -222,7 +222,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
     projectsFetched.current = true;
     void getProjects()
       .then(setProjects)
-      .catch(() => setError("Failed to load projects."));
+      .catch(() => toast.error("Failed to load projects."));
   }, []);
 
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
           setWeekEnd(week.end);
         }
       } catch {
-        if (active) setError("Failed to load data.");
+        if (active) toast.error("Failed to load data.");
       } finally {
         if (active) setLoading(false);
       }
@@ -404,11 +404,11 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError(null);
 
     const issues = validateForm();
     if (Object.keys(issues).length > 0) {
       setFieldErrors(issues);
+      toast.warning("Please fix the highlighted fields and try again.");
       return;
     }
     setFieldErrors({});
@@ -432,9 +432,10 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
       } else {
         await createReport(payload);
       }
+      toast.success(isEdit ? "Report updated." : "Report created.");
       router.push("/reports");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      toast.error(err instanceof Error ? err.message : "Something went wrong.");
       setSaving(false);
     }
   }
@@ -464,7 +465,6 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {error && <p className="text-sm text-[#C85C5C]">{error}</p>}
 
         {/* Basic Info */}
         <div id="details" className="scroll-mt-24 rounded-xl border border-[#E1E6ED] bg-white p-6 space-y-4 shadow-sm">
