@@ -33,8 +33,9 @@ export type UpdateProjectInput = {
   isActive?: boolean;
 };
 
-export function getProjects() {
-  return api.get<Project[]>("/api/projects");
+export function getProjects(options?: { mine?: boolean }) {
+  const query = options?.mine ? "?mine=1" : "";
+  return api.get<Project[]>(`/api/projects${query}`);
 }
 
 export function getProject(id: string) {

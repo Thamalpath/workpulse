@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 
+import type { AuthedRequest } from "../middleware/auth.middleware.js";
 import {
   archiveProject,
   createProject,
@@ -10,8 +11,10 @@ import {
   updateProject,
 } from "../services/project.service.js";
 
-export async function getProjects(_req: Request, res: Response) {
-  const data = await listProjects();
+export async function getProjects(req: Request, res: Response) {
+  const authed = req as AuthedRequest;
+  const mine = req.query.mine === "1" || req.query.mine === "true";
+  const data = await listProjects(mine ? authed.userId : undefined);
   res.json({ success: true, data });
 }
 

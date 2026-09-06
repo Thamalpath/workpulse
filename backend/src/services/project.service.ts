@@ -82,11 +82,13 @@ async function loadProject(id: string): Promise<ProjectRow | null> {
   return rows[0] ?? null;
 }
 
-export async function listProjects() {
+export async function listProjects(userId?: string) {
   const rows = (await query(
     `SELECT ${PROJECT_COLUMNS}
      FROM Project p
-     ORDER BY p.isActive DESC, p.name ASC`
+     ${userId ? "WHERE EXISTS (SELECT 1 FROM ProjectMember pm WHERE pm.projectId = p.id AND pm.userId = ?)" : ""}
+     ORDER BY p.isActive DESC, p.name ASC`,
+    userId ? [userId] : []
   )) as ProjectRow[];
   return rows.map(mapProject);
 }
