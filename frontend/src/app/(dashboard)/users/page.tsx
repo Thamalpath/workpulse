@@ -625,6 +625,7 @@ export default function UsersPage() {
   const canCreateRoles = permissions.includes("role.create");
   const canUpdateRoles = permissions.includes("role.update");
   const canDeleteRoles = permissions.includes("role.delete");
+  const canManageAssign = permissions.includes("assign.manage");
 
   const [users, setUsers] = useState<ManageUser[]>([]);
   const [roles, setRoles] = useState<ManagedRole[]>([]);
@@ -860,7 +861,7 @@ export default function UsersPage() {
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canUpdateRoles && (
+                  {canManageAssign && (
                     <Button size="sm" variant="outline" asChild>
                       <Link href="/assign-permissions">
                         <ListChecks /> Assign permissions

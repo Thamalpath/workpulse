@@ -16,9 +16,8 @@ import { FullPageLoader } from "@/components/loader";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import {
-  getPermissions,
-  getRoles,
-  updateRole,
+  getAssignments,
+  updateRolePermissions,
   type ManagedRole,
   type Permission,
 } from "@/services/user.service";
@@ -36,8 +35,8 @@ function groupPermissions(permissions: Permission[]): [string, Permission[]][] {
 export default function RolePermissionsPage() {
   const { permissions, hasRole, roles: myRoles, isLoading: authLoading } = useAuth();
   const isAdmin = hasRole("admin");
-  const canViewRoles = permissions.includes("role.view");
-  const canAssign = permissions.includes("role.update");
+  const canViewAssign = permissions.includes("assign.view");
+  const canAssign = permissions.includes("assign.manage");
 
   const [roles, setRoles] = useState<ManagedRole[]>([]);
   const [permissionList, setPermissionList] = useState<Permission[]>([]);
@@ -48,13 +47,10 @@ export default function RolePermissionsPage() {
   const fetchedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
-    const [roleData, permissionData] = await Promise.all([
-      getRoles(),
-      getPermissions(),
-    ]);
-    setRoles(roleData);
-    setPermissionList(permissionData);
-    return roleData;
+    const data = await getAssignments();
+    setRoles(data.roles);
+    setPermissionList(data.permissions);
+    return data.roles;
   }, []);
 
   useEffect(() => {
@@ -113,7 +109,7 @@ export default function RolePermissionsPage() {
   const locked = !!selectedRole && selectedRole.key === "admin";
 
   function togglePermission(permissionId: string) {
-    if (locked) return;
+    if (locked || !canAssign) return;
     setSelectedPerms((prev) => {
       const next = new Set(prev);
       if (next.has(permissionId)) {
@@ -126,7 +122,7 @@ export default function RolePermissionsPage() {
   }
 
   function toggleModule(module: string, list: Permission[]) {
-    if (locked) return;
+    if (locked || !canAssign) return;
     setSelectedPerms((prev) => {
       const next = new Set(prev);
       const moduleIds = list.map((p) => p.id);
@@ -141,7 +137,7 @@ export default function RolePermissionsPage() {
   }
 
   function toggleAll() {
-    if (locked) return;
+    if (locked || !canAssign) return;
     setSelectedPerms((prev) =>
       prev.size === permissionList.length
         ? new Set()
@@ -153,9 +149,7 @@ export default function RolePermissionsPage() {
     if (!selectedRole || !canAssign || locked) return;
     setSaving(true);
     try {
-      await updateRole(selectedRole.id, {
-        permissionIds: Array.from(selectedPerms),
-      });
+      await updateRolePermissions(selectedRole.id, Array.from(selectedPerms));
       toast.success(`Permissions updated for "${selectedRole.name}".`);
       const data = await refresh();
       setSelectedRoleId(selectedRole.id);
@@ -176,12 +170,12 @@ export default function RolePermissionsPage() {
     return <FullPageLoader />;
   }
 
-  if (!canViewRoles) {
+  if (!canViewAssign) {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center text-center">
         <UserCog className="size-10 text-[#596273]" />
         <p className="mt-3 text-sm text-muted-foreground">
-          You don&apos;t have permission to view roles.
+          You don&apos;t have permission to view assign permissions.
         </p>
       </div>
     );
@@ -351,6 +345,7 @@ export default function RolePermissionsPage() {
                                 onCheckedChange={() =>
                                   toggleModule(module, list)
                                 }
+                                disabled={!canAssign}
                                 aria-label={`Select all in ${module}`}
                               />
                             )}
@@ -368,7 +363,7 @@ export default function RolePermissionsPage() {
                               key={permission.id}
                               className={cn(
                                 "flex items-start gap-2 rounded-md px-1 py-1 text-sm",
-                                locked
+                                locked || !canAssign
                                   ? "cursor-not-allowed opacity-60"
                                   : "cursor-pointer hover:bg-[#F5F7FA]",
                               )}
@@ -382,7 +377,7 @@ export default function RolePermissionsPage() {
                                 onCheckedChange={() =>
                                   togglePermission(permission.id)
                                 }
-                                disabled={locked}
+                                disabled={locked || !canAssign}
                               />
                               <span>
                                 <span className="font-medium text-[#18202F]">

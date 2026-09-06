@@ -50,7 +50,7 @@ export const navigationItems: NavEntry[] = [
         label: "Assign Permissions",
         href: "/assign-permissions",
         icon: KeyRound,
-        permission: "role.view",
+        permission: "assign.view",
       },
     ],
   },

@@ -93,6 +93,16 @@ export function getPermissions() {
   return api.get<Permission[]>("/api/roles/permissions");
 }
 
+export function getAssignments() {
+  return api.get<{ roles: ManagedRole[]; permissions: Permission[] }>(
+    "/api/roles/assignments",
+  );
+}
+
+export function updateRolePermissions(id: string, permissionIds: string[]) {
+  return api.patch<ManagedRole>(`/api/roles/${id}/permissions`, { permissionIds });
+}
+
 export type CreatePermissionInput = {
   name: string;
   key: string;

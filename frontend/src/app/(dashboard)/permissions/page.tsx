@@ -368,7 +368,9 @@ export default function PermissionsPage() {
       cols.push({
         id: "actions",
         enableSorting: false,
+
         header: () => <div className="flex justify-end">Actions</div>,
+
         cell: ({ row }) => (
           <div className="flex justify-end gap-1">
             {canUpdate && (
@@ -376,13 +378,17 @@ export default function PermissionsPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() =>
-                  setDialog({ mode: "edit", permission: row.original })
+                  setDialog({
+                    mode: "edit",
+                    permission: row.original,
+                  })
                 }
                 aria-label={`Edit ${row.original.key}`}
               >
                 <Pencil />
               </Button>
             )}
+
             {canDelete && (
               <Button
                 variant="ghostDestructive"
@@ -424,13 +430,23 @@ export default function PermissionsPage() {
 
   return (
     <div className="flex w-full flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-[#18202F] sm:text-3xl">
-          Permissions
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Create, search, sort, and manage permissions used across the system.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight text-[#18202F] sm:text-3xl">
+            Permissions
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Create, search, sort, and manage permissions used across the system.
+          </p>
+        </div>
+        {canCreate && (
+          <Button
+            className="bg-[#4263A3] text-white hover:bg-[#344F85]"
+            onClick={() => setDialog({ mode: "create" })}
+          >
+            <Plus /> Add permission
+          </Button>
+        )}
       </div>
 
       <DataTable
