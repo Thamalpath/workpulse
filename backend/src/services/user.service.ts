@@ -33,6 +33,25 @@ function mapUser(row: UserRow, roles: RoleShape[]) {
   };
 }
 
+export async function getAdminRoleId(): Promise<string | null> {
+  const rows = (await query(
+    `SELECT id FROM Role WHERE \`key\` = 'admin' LIMIT 1`,
+  )) as { id: string | number }[];
+  return rows[0] ? String(rows[0].id) : null;
+}
+
+export async function isAdminUser(userId: string | number): Promise<boolean> {
+  const rows = (await query(
+    `SELECT 1
+     FROM UserRole ur
+     JOIN Role r ON r.id = ur.roleId
+     WHERE ur.userId = ? AND r.\`key\` = 'admin'
+     LIMIT 1`,
+    [userId],
+  )) as Record<string, unknown>[];
+  return rows.length > 0;
+}
+
 async function getRolesForUser(userId: string | number): Promise<RoleShape[]> {
   const roleRows = (await query(
     `SELECT r.id, r.\`key\`, r.name
@@ -76,10 +95,24 @@ async function fetchUserWithRoles(id: string) {
   return mapUser(row, roles);
 }
 
-export async function listUsers() {
+export async function listUsers(options: { excludeAdmins?: boolean } = {}) {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+  if (options.excludeAdmins) {
+    conditions.push(
+      `u.id NOT IN (
+        SELECT ur3.userId FROM UserRole ur3
+        JOIN Role r3 ON r3.id = ur3.roleId
+        WHERE r3.\`key\` = 'admin'
+      )`,
+    );
+  }
+  const whereSql = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
   const rows = (await query(
-    `SELECT id, email, username, name, isActive, createdAt
-     FROM User ORDER BY createdAt DESC`
+    `SELECT u.id, u.email, u.username, u.name, u.isActive, u.createdAt
+     FROM User u${whereSql}
+     ORDER BY u.createdAt DESC`,
+    params,
   )) as UserRow[];
 
   const result = [];
@@ -98,13 +131,23 @@ export async function getUserById(id: string) {
   return user;
 }
 
-export async function createUser(data: {
-  name: string;
-  email: string;
-  username: string;
-  password: string;
-  roleIds: string[];
-}) {
+export async function createUser(
+  data: {
+    name: string;
+    email: string;
+    username: string;
+    password: string;
+    roleIds: string[];
+  },
+  options: { isAdmin?: boolean } = {},
+) {
+  if (options.isAdmin !== true) {
+    const adminRoleId = await getAdminRoleId();
+    if (adminRoleId !== null && data.roleIds.includes(adminRoleId)) {
+      throw new ApiError(403, "Only admins can assign users to the Admin role.");
+    }
+  }
+
   const email = data.email.toLowerCase();
   const username = data.username.toLowerCase();
 
@@ -156,13 +199,21 @@ export async function updateUser(
     isActive?: boolean;
     roleIds?: string[];
     password?: string;
-  }
+  },
+  options: { isAdmin?: boolean } = {},
 ) {
   const existing = (await query(`SELECT id FROM User WHERE id = ? LIMIT 1`, [id])) as {
     id: string | number;
   }[];
   if (existing.length === 0) {
     throw new ApiError(404, "User not found.");
+  }
+
+  if (data.roleIds !== undefined && options.isAdmin !== true) {
+    const adminRoleId = await getAdminRoleId();
+    if (adminRoleId !== null && data.roleIds.includes(adminRoleId)) {
+      throw new ApiError(403, "Only admins can assign users to the Admin role.");
+    }
   }
 
   if (data.name !== undefined) {

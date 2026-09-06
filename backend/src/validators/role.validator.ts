@@ -18,6 +18,12 @@ export const validateCreateRole = validateBody({
 });
 
 export const validateUpdateRole = validateBody({
-  name: { isString: true, minLength: 2, message: "Role name must be at least 2 characters." },
-  description: { isString: true },
+  name: {
+    optional: true,
+    isString: true,
+    minLength: 2,
+    message: "Role name must be at least 2 characters.",
+  },
+  description: { optional: true, isString: true },
+  permissionIds: { optional: true, isStringArray: true },
 });

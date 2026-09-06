@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ListChecks,
@@ -615,7 +615,8 @@ function RoleDialog({
 }
 
 export default function UsersPage() {
-  const { permissions } = useAuth();
+  const { permissions, hasRole, roles: myRoles, isLoading: authLoading } = useAuth();
+  const isAdmin = hasRole("admin");
   const canViewUsers = permissions.includes("user.view");
   const canViewRoles = permissions.includes("role.view");
   const canCreateUsers = permissions.includes("user.create");
@@ -632,10 +633,11 @@ export default function UsersPage() {
   const [userDialog, setUserDialog] = useState<UserDialogState>(null);
   const [roleDialog, setRoleDialog] = useState<RoleDialogState>(null);
   const [confirm, confirmNode] = useConfirm();
+  const fetchedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
     const [userData, roleData, permissionData] = await Promise.all([
-      canViewUsers ? getUsers() : Promise.resolve([]),
+      canViewUsers ? getUsers("manage") : Promise.resolve([]),
       canViewRoles ? getRoles() : Promise.resolve([]),
       canViewRoles ? getPermissions() : Promise.resolve([]),
     ]);
@@ -645,11 +647,30 @@ export default function UsersPage() {
   }, [canViewUsers, canViewRoles]);
 
   useEffect(() => {
+    if (authLoading || fetchedOnce.current) {
+      return;
+    }
+    fetchedOnce.current = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     void refresh()
       .catch(() => undefined)
       .finally(() => setLoading(false));
-  }, [refresh]);
+  }, [authLoading, refresh]);
+
+  const myRoleKeys = useMemo(
+    () => new Set(myRoles.map((role) => role.key)),
+    [myRoles],
+  );
+  const visibleRoles = useMemo(
+    () =>
+      isAdmin
+        ? roles
+        : roles.filter(
+            (role) =>
+              role.key !== "admin" && !myRoleKeys.has(role.key),
+          ),
+    [isAdmin, roles, myRoleKeys],
+  );
 
   async function handleDeleteUser(user: ManageUser) {
     if (
@@ -871,7 +892,7 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {roles.map((role) => (
+                  {visibleRoles.map((role) => (
                     <TableRow key={role.id}>
                       <TableCell className="font-medium text-[#18202F]">
                         {role.name}
@@ -927,7 +948,7 @@ export default function UsersPage() {
       {userDialog && (
         <UserDialog
           state={userDialog}
-          roles={roles}
+          roles={visibleRoles}
           onClose={() => setUserDialog(null)}
           onSaved={refresh}
         />

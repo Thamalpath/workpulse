@@ -57,8 +57,8 @@ export type UpdateRoleInput = {
   permissionIds?: string[];
 };
 
-export function getUsers() {
-  return api.get<ManageUser[]>("/api/users");
+export function getUsers(scope: "manage" | "members" = "members") {
+  return api.get<ManageUser[]>(`/api/users?scope=${scope}`);
 }
 
 export function createUser(data: CreateUserInput) {

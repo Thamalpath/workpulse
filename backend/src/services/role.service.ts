@@ -56,13 +56,17 @@ async function getRoleUserCount(roleId: string | number): Promise<number> {
   return Number(rows[0]?.count ?? 0);
 }
 
-export async function listRoles() {
+export async function listRoles(options: { hideRoleKeys?: string[] } = {}) {
   const roles = (await query(
     `SELECT id, \`key\`, name, description FROM Role ORDER BY createdAt ASC`,
   )) as RoleRow[];
 
+  const visible = options.hideRoleKeys?.length
+    ? roles.filter((role) => !(options.hideRoleKeys as string[]).includes(role.key))
+    : roles;
+
   const result = [];
-  for (const role of roles) {
+  for (const role of visible) {
     const [permissions, userCount] = await Promise.all([
       getRolePermissions(role.id),
       getRoleUserCount(role.id),

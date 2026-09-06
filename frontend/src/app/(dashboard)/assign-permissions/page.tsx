@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CheckCheck,
@@ -34,7 +34,8 @@ function groupPermissions(permissions: Permission[]): [string, Permission[]][] {
 }
 
 export default function RolePermissionsPage() {
-  const { permissions } = useAuth();
+  const { permissions, hasRole, roles: myRoles, isLoading: authLoading } = useAuth();
+  const isAdmin = hasRole("admin");
   const canViewRoles = permissions.includes("role.view");
   const canAssign = permissions.includes("role.update");
 
@@ -44,6 +45,7 @@ export default function RolePermissionsPage() {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [selectedPerms, setSelectedPerms] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const fetchedOnce = useRef(false);
 
   const refresh = useCallback(async () => {
     const [roleData, permissionData] = await Promise.all([
@@ -56,15 +58,34 @@ export default function RolePermissionsPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || fetchedOnce.current) {
+      return;
+    }
+    fetchedOnce.current = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     void refresh()
       .catch(() => undefined)
       .finally(() => setLoading(false));
-  }, [refresh]);
+  }, [authLoading, refresh]);
+
+  const myRoleKeys = useMemo(
+    () => new Set(myRoles.map((role) => role.key)),
+    [myRoles],
+  );
+  const visibleRoles = useMemo(
+    () =>
+      isAdmin
+        ? roles
+        : roles.filter(
+            (role) =>
+              role.key !== "admin" && !myRoleKeys.has(role.key),
+          ),
+    [isAdmin, roles, myRoleKeys],
+  );
 
   const selectedRole = useMemo(
-    () => roles.find((role) => role.id === selectedRoleId) ?? null,
-    [roles, selectedRoleId],
+    () => visibleRoles.find((role) => role.id === selectedRoleId) ?? null,
+    [visibleRoles, selectedRoleId],
   );
 
   // Sync the working selection whenever the selected role changes.
@@ -184,7 +205,7 @@ export default function RolePermissionsPage() {
             <h2 className="text-base font-semibold text-[#18202F]">Roles</h2>
           </div>
           <div className="max-h-[calc(100vh-280px)] overflow-y-auto p-2">
-            {roles.map((role) => {
+            {visibleRoles.map((role) => {
               const selected = role.id === selectedRoleId;
               return (
                 <button
