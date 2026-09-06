@@ -176,7 +176,12 @@ async function fetchSummaryMetrics(
      JOIN Role r ON r.id = ur.roleId
      JOIN RolePermission rp ON rp.roleId = r.id
      JOIN Permission p ON p.id = rp.permissionId
-     WHERE u.isActive = 1 AND p.\`key\` = ?`,
+     WHERE u.isActive = 1 AND p.\`key\` = ?
+       AND u.id NOT IN (
+         SELECT ur2.userId FROM UserRole ur2
+         JOIN Role r2 ON r2.id = ur2.roleId
+         WHERE r2.\`key\` = 'admin'
+       )`,
     [PERMISSIONS.REPORT_SUBMIT],
   )) as Record<string, unknown>[];
 
@@ -297,6 +302,11 @@ async function fetchMemberStatusDistribution(
      JOIN RolePermission rp ON rp.roleId = r.id
      JOIN Permission p ON p.id = rp.permissionId
      WHERE u.isActive = 1 AND p.\`key\` = ?
+       AND u.id NOT IN (
+         SELECT ur2.userId FROM UserRole ur2
+         JOIN Role r2 ON r2.id = ur2.roleId
+         WHERE r2.\`key\` = 'admin'
+       )
      ORDER BY u.name ASC`,
     [PERMISSIONS.REPORT_SUBMIT],
   )) as { id: string | number; name: string; email: string }[];

@@ -185,6 +185,20 @@ export async function setProjectMembers(id: string, userIds: string[]) {
     if (found.length !== uniqueIds.length) {
       throw new ApiError(400, "One or more selected team members do not exist.");
     }
+
+    const admins = (await query(
+      `SELECT ur2.userId
+       FROM UserRole ur2
+       JOIN Role r2 ON r2.id = ur2.roleId
+       WHERE r2.\`key\` = 'admin' AND ur2.userId IN (${placeholders})`,
+      uniqueIds
+    )) as { userId: string | number }[];
+    if (admins.length > 0) {
+      throw new ApiError(
+        400,
+        "Admin users cannot be assigned as project team members.",
+      );
+    }
   }
 
   await withTransaction(async (exec) => {

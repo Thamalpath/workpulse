@@ -454,6 +454,11 @@ async function getTeamRoster(args: {
      JOIN RolePermission rp ON rp.roleId = r.id
      JOIN Permission p ON p.id = rp.permissionId
      WHERE ${where.join(" AND ")} AND p.\`key\` = ?
+       AND u.id NOT IN (
+         SELECT ur2.userId FROM UserRole ur2
+         JOIN Role r2 ON r2.id = ur2.roleId
+         WHERE r2.\`key\` = 'admin'
+       )
      ORDER BY u.name ASC`,
     [...params, PERMISSIONS.REPORT_SUBMIT]
   )) as { id: string | number; name: string; email: string }[];
