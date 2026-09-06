@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import {
   LogOut,
   Menu,
@@ -10,6 +11,7 @@ import {
   User,
 } from "lucide-react";
 
+import chatSrc from "@/assets/Chatbot.lottie";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { navigationItems } from "@/config/navigation";
@@ -26,6 +28,7 @@ type NavbarProps = {
   onOpenSidebar: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onOpenChat: () => void;
 };
 
 function UserMenu() {
@@ -68,6 +71,7 @@ export function Navbar({
   onOpenSidebar,
   collapsed,
   onToggleCollapse,
+  onOpenChat,
 }: NavbarProps) {
   const pathname = usePathname();
 
@@ -165,12 +169,29 @@ export function Navbar({
         </Breadcrumb>
       </div>
 
-      <div className="flex items-center gap-2 lg:hidden">
-        <UserMenu />
-      </div>
-
-      <div className="hidden items-center gap-3 lg:flex">
-        <UserMenu />
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-9 overflow-hidden border-[#E1E6ED] p-0 text-[#596273] transition-colors hover:border-[#4263A3]/40 hover:bg-[#4263A3]/5"
+          onClick={onOpenChat}
+          aria-label="Open AI chat assistant"
+          title="AI Chat Assistant"
+        >
+          <DotLottieReact
+            src={chatSrc}
+            autoplay
+            loop
+            useFrameInterpolation
+            style={{ width: 30, height: 30 }}
+          />
+        </Button>
+        <div className="lg:hidden">
+          <UserMenu />
+        </div>
+        <div className="hidden lg:block">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { AuthGuard } from "@/components/auth-guard";
+import { AiChatAssistant } from "@/components/ai-chat/ai-chat-assistant";
 import { Navbar } from "@/components/layout/navbar";
 import { Sidebar } from "@/components/layout/sidebar";
 
@@ -13,6 +14,7 @@ export default function DashboardLayout({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <AuthGuard>
@@ -28,9 +30,12 @@ export default function DashboardLayout({
             onOpenSidebar={() => setMobileOpen(true)}
             collapsed={collapsed}
             onToggleCollapse={() => setCollapsed(!collapsed)}
+            onOpenChat={() => setChatOpen(true)}
           />
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
+
+        <AiChatAssistant open={chatOpen} onOpenChange={setChatOpen} />
       </div>
     </AuthGuard>
   );
