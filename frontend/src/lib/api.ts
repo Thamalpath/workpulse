@@ -14,13 +14,11 @@ type ApiResponse<T> = {
   message?: string;
 };
 
-const API_BASE: string = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 async function request<T>(
   path: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(path, {
     ...options,
     credentials: "include",
     headers: {
