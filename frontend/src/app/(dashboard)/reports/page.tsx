@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,14 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import type { Row } from "@tanstack/react-table";
 import { FullPageLoader } from "@/components/loader";
 import { ReviewDialog } from "@/components/reports/review-dialog";
 import { useAuth } from "@/contexts/auth-context";
@@ -117,15 +111,141 @@ export default function ReportsPage() {
     return `${formatDate(start)} — ${formatDate(end)}`;
   }
 
-  if (loading) {
-    return <FullPageLoader />;
-  }
-
   const isManager = canViewAll && (permissions.includes("report.approve") || permissions.includes("role.view"));
 
   const visibleReports = statusFilter === "all"
     ? reports
     : reports.filter((report) => report.status === statusFilter);
+
+  const columns = useMemo<DataTableColumn<Report>[]>(() => {
+    const actionsCell = ({ row }: { row: Row<Report> }) => {
+      const report = row.original;
+      const isOwn = String(report.userId) === String(user?.id);
+      const canEditOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
+      const canDeleteOwn = isOwn && report.status === "draft";
+      const canSubmitOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
+      const canReviewStatus = isManager && report.status === "submitted";
+
+      return (
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/reports/${encodeId(report.id)}`)}
+            aria-label="View report"
+          >
+            <ArrowRight className="size-4" />
+          </Button>
+          {canEditOwn && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push(`/reports/${encodeId(report.id)}/edit`)}
+              aria-label="Edit report"
+            >
+              <Pencil className="size-4" />
+            </Button>
+          )}
+          {canSubmitOwn && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-[#4263A3]"
+              onClick={() => handleSubmit(report.id)}
+              aria-label="Submit report"
+            >
+              <Send className="size-4" />
+            </Button>
+          )}
+          {canReviewStatus && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-[#4263A3]"
+              onClick={() => setReviewTarget(report)}
+              aria-label="Review report"
+            >
+              <ClipboardCheck className="size-4" />
+            </Button>
+          )}
+          {canDeleteOwn && (
+            <Button
+              variant="ghostDestructive"
+              size="icon"
+              onClick={() => handleDelete(report.id)}
+              aria-label="Delete report"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          )}
+        </div>
+      );
+    };
+
+    const cols: DataTableColumn<Report>[] = [
+      {
+        accessorKey: "weekStartDate",
+        header: "Week",
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
+            <p className="font-medium text-[#18202F]">
+              {formatWeekRange(r.weekStartDate, r.weekEndDate)}
+            </p>
+          );
+        },
+      },
+      {
+        accessorKey: "projectName",
+        header: "Project",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.projectName ?? "—"}</span>
+        ),
+      },
+      ...(isManager
+        ? [
+            {
+              accessorKey: "userName",
+              header: "Author",
+              cell: ({ row }: { row: Row<Report> }) => (
+                <span className="text-muted-foreground">{row.original.userName}</span>
+              ),
+            } as DataTableColumn<Report>,
+          ]
+        : []),
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
+            <span
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[r.status]}`}
+            >
+              {STATUS_LABELS[r.status]}
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: "updatedAt",
+        header: "Updated",
+        cell: ({ row }) => (
+          <span className="text-muted-foreground text-sm">
+            {formatDate(row.original.updatedAt)}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="text-right">Actions</span>,
+        cell: actionsCell,
+        enableSorting: false,
+        enableGlobalFilter: false,
+      },
+    ];
+    return cols;
+  }, [isManager, user, router, handleDelete, handleSubmit]);
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -178,134 +298,32 @@ export default function ReportsPage() {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#E1E6ED] bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Week</TableHead>
-              <TableHead>Project</TableHead>
-              {isManager && <TableHead>Author</TableHead>}
-              <TableHead>Status</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visibleReports.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={isManager ? 6 : 5}>
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <FileText className="size-10 text-[#596273]" />
-                    <p className="mt-3 text-sm font-medium text-[#18202F]">
-                      No reports yet
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {canCreate
-                        ? "Create your first weekly report to get started."
-                        : "No reports match this filter."}
-                    </p>
-                    {canCreate && (
-                      <Button asChild size="sm" className="mt-4 bg-[#4263A3] text-white hover:bg-[#344F85]">
-                        <Link href="/reports/create">
-                          <Plus className="size-4" /> New report
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              visibleReports.map((report) => {
-                const isOwn = String(report.userId) === String(user?.id);
-                const canEditOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
-                const canDeleteOwn = isOwn && report.status === "draft";
-                const canSubmitOwn = isOwn && (report.status === "draft" || report.status === "needs_correction");
-                const canReview = isManager && report.status === "submitted";
-
-                return (
-                  <TableRow key={report.id}>
-                    <TableCell>
-                      <p className="font-medium text-[#18202F]">
-                        {formatWeekRange(report.weekStartDate, report.weekEndDate)}
-                      </p>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {report.projectName ?? "—"}
-                    </TableCell>
-                    {isManager && (
-                      <TableCell className="text-muted-foreground">
-                        {report.userName}
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[report.status]}`}>
-                        {STATUS_LABELS[report.status]}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatDate(report.updatedAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => router.push(`/reports/${encodeId(report.id)}`)}
-                          aria-label="View report"
-                        >
-                          <ArrowRight className="size-4" />
-                        </Button>
-                        {canEditOwn && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => router.push(`/reports/${encodeId(report.id)}/edit`)}
-                            aria-label="Edit report"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                        )}
-                        {canSubmitOwn && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-[#4263A3]"
-                            onClick={() => handleSubmit(report.id)}
-                            aria-label="Submit report"
-                          >
-                            <Send className="size-4" />
-                          </Button>
-                        )}
-                        {canReview && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-[#4263A3]"
-                            onClick={() => setReviewTarget(report)}
-                            aria-label="Review report"
-                          >
-                            <ClipboardCheck className="size-4" />
-                          </Button>
-                        )}
-                        {canDeleteOwn && (
-                          <Button
-                            variant="ghostDestructive"
-                            size="icon"
-                            onClick={() => handleDelete(report.id)}
-                            aria-label="Delete report"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+      <DataTable
+        data={visibleReports}
+        columns={columns}
+        defaultPageSize={10}
+        emptyMessage={
+          <>
+            <FileText className="size-10 text-[#596273]" />
+            <p className="mt-3 text-sm font-medium text-[#18202F]">
+              No reports yet
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {canCreate
+                ? "Create your first weekly report to get started."
+                : "No reports match this filter."}
+            </p>
+            {canCreate && (
+              <Button asChild size="sm" className="mt-4 bg-[#4263A3] text-white hover:bg-[#344F85]">
+                <Link href="/reports/create">
+                  <Plus className="size-4" /> New report
+                </Link>
+              </Button>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </>
+        }
+        noResultsMessage="No reports match your search or filters."
+      />
 
       <ReviewDialog
         key={reviewTarget?.id ?? "closed"}

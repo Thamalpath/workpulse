@@ -54,10 +54,10 @@ export type DataTableProps<TData, TValue = unknown> = {
   pageSizeOptions?: number[];
   /** Default sorting, e.g. [{ id: "name", desc: false }]. */
   defaultSorting?: SortingState;
-  /** Text shown when the table has no rows at all. */
-  emptyMessage?: string;
-  /** Text shown when search/sorting yield zero rows. */
-  noResultsMessage?: string;
+  /** Content shown when the table has no rows at all. */
+  emptyMessage?: React.ReactNode;
+  /** Content shown when search/sorting yield zero rows. */
+  noResultsMessage?: React.ReactNode;
   /** Extra content rendered next to the page-size select. */
   toolbar?: React.ReactNode;
   /** Makes rows clickable; receives the click event target. */
