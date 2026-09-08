@@ -1000,6 +1000,28 @@ async function seed() {
         [reportId, hw.category, hw.hours],
       );
     }
+
+    if (versionNumber > 0) {
+      await insert(
+        `INSERT INTO ReportVersion
+           (reportId, versionNumber, projectId, weekStartDate, weekEndDate, notes,
+            tasks, nextWeekTasks, blockers, achievements, hoursWorked)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          reportId,
+          versionNumber,
+          projectId,
+          weekStartISO,
+          weekEndISO,
+          report.notes ?? null,
+          JSON.stringify(report.tasks ?? []),
+          JSON.stringify(report.nextWeekTasks ?? []),
+          JSON.stringify(report.blockers ?? []),
+          JSON.stringify(report.achievements ?? []),
+          JSON.stringify(report.hoursWorked ?? []),
+        ],
+      );
+    }
   }
 
   console.log("Seeding complete.");

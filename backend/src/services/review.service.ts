@@ -1,6 +1,6 @@
 import { query, withTransaction } from "../config/database.js";
 import { ApiError } from "../utils/api-error.js";
-import { getReportById } from "./report.service.js";
+import { getReportById, backfillReportVersion } from "./report.service.js";
 import { getLatestVersion } from "./reportVersion.service.js";
 
 export type ReviewAction = "approved" | "request_correction";
@@ -36,9 +36,17 @@ export async function reviewReport(
     throw new ApiError(403, "You cannot review your own report.");
   }
 
-  const latestVersion = await getLatestVersion(reportId);
-  if (!latestVersion) {
-    throw new ApiError(400, "This report has no submitted version to review.");
+  let latestVersion: { id: string; reportId: string; versionNumber: number; projectId: string | number | null; weekStartDate: string; weekEndDate: string; notes: string | null; projectName: string | null; createdAt: Date };
+
+  const backfilledVersion = await getLatestVersion(reportId);
+  if (!backfilledVersion) {
+    const created = await backfillReportVersion(reportId);
+    if (!created) {
+      throw new ApiError(400, "This report has no submitted version to review.");
+    }
+    latestVersion = created;
+  } else {
+    latestVersion = backfilledVersion;
   }
 
   const nextStatus = action === "approved" ? "approved" : "needs_correction";

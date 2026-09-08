@@ -76,6 +76,12 @@ function toBoolean(value: unknown): boolean {
   return value === true || value === 1 || value === "1";
 }
 
+function isDuplicateEntryError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  return code === "ER_DUP_ENTRY";
+}
+
 function toId(value: string | number): string {
   return String(value);
 }
@@ -812,17 +818,34 @@ export async function assertCanReadReport(id: string, viewerId: string, permissi
 }
 
 export async function createReport(userId: string, data: CreateReportInput) {
-  const id = toId(
-    await withTransaction(async (exec) => {
-      const insertId = await exec.insertId(
-        `INSERT INTO WeeklyReport (userId, projectId, weekStartDate, weekEndDate, notes)
-         VALUES (?, ?, ?, ?, ?)`,
-        [userId, data.projectId ?? null, toDateParam(data.weekStartDate), toDateParam(data.weekEndDate), data.notes ?? null]
-      );
-      await replaceNested(exec, insertId, data);
-      return insertId;
-    })
-  );
+  const weekStart = toDateParam(data.weekStartDate);
+  const existing = (await query(
+    `SELECT id FROM WeeklyReport WHERE userId = ? AND weekStartDate = ? LIMIT 1`,
+    [userId, weekStart]
+  )) as { id: string | number }[];
+  if (existing.length > 0) {
+    throw new ApiError(409, "A report already exists for this week.");
+  }
+
+  let id: string;
+  try {
+    id = toId(
+      await withTransaction(async (exec) => {
+        const insertId = await exec.insertId(
+          `INSERT INTO WeeklyReport (userId, projectId, weekStartDate, weekEndDate, notes)
+           VALUES (?, ?, ?, ?, ?)`,
+          [userId, data.projectId ?? null, weekStart, toDateParam(data.weekEndDate), data.notes ?? null]
+        );
+        await replaceNested(exec, insertId, data);
+        return insertId;
+      })
+    );
+  } catch (err) {
+    if (isDuplicateEntryError(err)) {
+      throw new ApiError(409, "A report already exists for this week.");
+    }
+    throw err;
+  }
 
   return getReportById(id);
 }
@@ -935,6 +958,103 @@ export async function transitionStatus(id: string, userId: string, newStatus: st
   });
 
   return getReportById(id);
+}
+
+export async function backfillReportVersion(reportId: string | number): Promise<{
+  id: string;
+  reportId: string;
+  versionNumber: number;
+  projectId: string | number | null;
+  weekStartDate: string;
+  weekEndDate: string;
+  notes: string | null;
+  projectName: string | null;
+  createdAt: Date;
+} | null> {
+  const existing = (await query(
+    `SELECT v.id, v.reportId, v.versionNumber, v.projectId, v.weekStartDate, v.weekEndDate, v.notes, v.createdAt,
+            p.name AS projectName
+     FROM ReportVersion v
+     LEFT JOIN Project p ON p.id = v.projectId
+     WHERE v.reportId = ?
+     ORDER BY v.versionNumber DESC LIMIT 1`,
+    [reportId]
+  )) as {
+    id: string | number;
+    reportId: string | number;
+    versionNumber: number;
+    projectId: string | number | null;
+    weekStartDate: string;
+    weekEndDate: string;
+    notes: string | null;
+    projectName: string | null;
+    createdAt: Date;
+  }[];
+  if (existing.length > 0) {
+    const r = existing[0]!;
+    return {
+      id: toId(r.id),
+      reportId: toId(r.reportId),
+      versionNumber: Number(r.versionNumber),
+      projectId: r.projectId != null ? toId(r.projectId) : null,
+      weekStartDate: toDateString(r.weekStartDate),
+      weekEndDate: toDateString(r.weekEndDate),
+      notes: r.notes,
+      projectName: r.projectName,
+      createdAt: r.createdAt,
+    };
+  }
+
+  const report = (await query(
+    `SELECT id, projectId, weekStartDate, weekEndDate, notes, versionNumber FROM WeeklyReport WHERE id = ? LIMIT 1`,
+    [reportId]
+  )) as {
+    id: string | number;
+    projectId: string | number | null;
+    weekStartDate: string;
+    weekEndDate: string;
+    notes: string | null;
+    versionNumber: number;
+  }[];
+  const row = report[0];
+  if (!row) return null;
+
+  const versionNumber = Math.max(1, Number(row.versionNumber ?? 0));
+
+  const versionId = await withTransaction(async (exec) => {
+    const content = await loadReportContent(reportId, exec);
+
+    return exec.insertId(
+      `INSERT INTO ReportVersion (reportId, versionNumber, projectId, weekStartDate, weekEndDate, notes,
+                                  tasks, nextWeekTasks, blockers, achievements, hoursWorked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        reportId,
+        versionNumber,
+        row.projectId ?? null,
+        toDateParam(row.weekStartDate),
+        toDateParam(row.weekEndDate),
+        row.notes ?? null,
+        JSON.stringify(content.tasks),
+        JSON.stringify(content.nextWeekTasks),
+        JSON.stringify(content.blockers),
+        JSON.stringify(content.achievements),
+        JSON.stringify(content.hoursWorked),
+      ]
+    );
+  });
+
+  return {
+    id: toId(versionId),
+    reportId: toId(reportId),
+    versionNumber,
+    projectId: row.projectId != null ? toId(row.projectId) : null,
+    weekStartDate: toDateString(row.weekStartDate),
+    weekEndDate: toDateString(row.weekEndDate),
+    notes: row.notes,
+    projectName: null,
+    createdAt: new Date(),
+  };
 }
 
 export async function getAvailableCategories(): Promise<string[]> {

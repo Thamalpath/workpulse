@@ -32,6 +32,7 @@ import {
   type HoursWorked,
 } from "@/services/report.service";
 import { getProjects, type Project } from "@/services/project.service";
+import { ApiError } from "@/lib/api";
 
 function getCurrentWeekDates() {
   const now = new Date();
@@ -585,7 +586,12 @@ export default function ReportFormPage({ editId }: { editId?: string }) {
       toast.success(isEdit ? "Report updated." : "Report created.");
       router.push("/reports");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong.");
+      const isDuplicate = err instanceof ApiError && err.status === 409;
+      toast.error(
+        isDuplicate
+          ? "A report already exists for this week. Please edit your existing report."
+          : (err instanceof Error ? err.message : "Something went wrong."),
+      );
       setSaving(false);
     }
   }
