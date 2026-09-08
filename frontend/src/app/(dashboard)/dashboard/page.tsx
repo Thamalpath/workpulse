@@ -5,26 +5,24 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   ExternalLink,
   FileCheck,
   FileText,
   FilterX,
   FolderKanban,
-  Layers,
-  LayoutGrid,
   LineChart,
-  ListFilter,
   Loader2,
   RefreshCw,
   RotateCcw,
   Search,
-  Sparkles,
   TableProperties,
-  Tag,
   Users,
   XCircle,
 } from "lucide-react";
@@ -144,6 +142,78 @@ function MetricKpiCard({
   );
 }
 
+function TablePagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  onChange,
+}: {
+  page: number;
+  pageCount: number;
+  total: number;
+  pageSize: number;
+  onChange: (page: number) => void;
+}) {
+  if (total <= pageSize) return null;
+  const firstRow = page * pageSize + 1;
+  const lastRow = Math.min((page + 1) * pageSize, total);
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-[#E1E6ED] px-5 py-3">
+      <p className="text-xs text-muted-foreground">
+        Showing <span className="font-medium text-[#18202F]">{firstRow}</span>{" "}
+        to <span className="font-medium text-[#18202F]">{lastRow}</span> of{" "}
+        <span className="font-medium text-[#18202F]">{total}</span>
+      </p>
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8"
+          onClick={() => onChange(0)}
+          disabled={page === 0}
+          aria-label="First page"
+        >
+          <ChevronsLeft className="size-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8"
+          onClick={() => onChange(page - 1)}
+          disabled={page === 0}
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="size-4" />
+        </Button>
+        <span className="min-w-[80px] text-center text-xs text-muted-foreground">
+          Page {page + 1} of {pageCount}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8"
+          onClick={() => onChange(page + 1)}
+          disabled={page >= pageCount - 1}
+          aria-label="Next page"
+        >
+          <ChevronRight className="size-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="size-8"
+          onClick={() => onChange(pageCount - 1)}
+          disabled={page >= pageCount - 1}
+          aria-label="Last page"
+        >
+          <ChevronsRight className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { permissions, user } = useAuth();
   const router = useRouter();
@@ -162,7 +232,9 @@ export default function DashboardPage() {
   // Data state
   const [team, setTeam] = useState<TeamWeeklyResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [categories, setCategories] = useState<string[]>([...DEFAULT_HOURS_CATEGORIES]);
+  const [categories, setCategories] = useState<string[]>([
+    ...DEFAULT_HOURS_CATEGORIES,
+  ]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const fetchInFlight = useRef(false);
@@ -172,7 +244,9 @@ export default function DashboardPage() {
   const [memberFilter, setMemberFilter] = useState<string>("all");
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<TeamMemberStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<TeamMemberStatus | "all">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Report detail & review modal
@@ -181,6 +255,20 @@ export default function DashboardPage() {
 
   // View state
   const [activeTab, setActiveTab] = useState<"roster" | "reports">("roster");
+
+  // Pagination state (pagination-only, no other data table features)
+  const ROSTER_PAGE_SIZE = 5;
+  const REPORTS_PAGE_SIZE = 5;
+  const [rosterPage, setRosterPage] = useState(0);
+  const [reportsPage, setReportsPage] = useState(0);
+
+  useEffect(() => {
+    setRosterPage(0);
+  }, [memberFilter, projectFilter, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    setReportsPage(0);
+  }, [memberFilter, projectFilter, statusFilter, searchQuery]);
 
   const loadData = useCallback(
     async (isSilent = false) => {
@@ -285,7 +373,8 @@ export default function DashboardPage() {
     for (const member of team.members) {
       if (memberFilter !== "all" && member.id !== memberFilter) continue;
       for (const report of member.reports) {
-        if (projectFilter !== "all" && report.projectId !== projectFilter) continue;
+        if (projectFilter !== "all" && report.projectId !== projectFilter)
+          continue;
         if (statusFilter !== "all" && report.status !== statusFilter) continue;
         if (searchQuery.trim() !== "") {
           const q = searchQuery.toLowerCase();
@@ -303,6 +392,34 @@ export default function DashboardPage() {
         new Date(a.updatedAt || a.createdAt).getTime(),
     );
   }, [team, memberFilter, projectFilter, statusFilter, searchQuery]);
+
+  // Paginated slices (only shown when there are more than the page size)
+  const rosterPages = Math.ceil(filteredRoster.length / ROSTER_PAGE_SIZE);
+  const reportsPages = Math.ceil(allReportsList.length / REPORTS_PAGE_SIZE);
+
+  useEffect(() => {
+    if (rosterPage >= rosterPages) setRosterPage(0);
+  }, [rosterPages, rosterPage]);
+  useEffect(() => {
+    if (reportsPage >= reportsPages) setReportsPage(0);
+  }, [reportsPages, reportsPage]);
+
+  const paginatedRoster = useMemo(
+    () =>
+      filteredRoster.slice(
+        rosterPage * ROSTER_PAGE_SIZE,
+        (rosterPage + 1) * ROSTER_PAGE_SIZE,
+      ),
+    [filteredRoster, rosterPage],
+  );
+  const paginatedReports = useMemo(
+    () =>
+      allReportsList.slice(
+        reportsPage * REPORTS_PAGE_SIZE,
+        (reportsPage + 1) * REPORTS_PAGE_SIZE,
+      ),
+    [allReportsList, reportsPage],
+  );
 
   // Dynamic KPI Metrics derived from active filters
   const metrics = useMemo(() => {
@@ -394,7 +511,10 @@ export default function DashboardPage() {
             title="Refresh dashboard data"
           >
             <RefreshCw
-              className={cn("size-4", refreshing && "animate-spin text-[#4263A3]")}
+              className={cn(
+                "size-4",
+                refreshing && "animate-spin text-[#4263A3]",
+              )}
             />
           </Button>
         </div>
@@ -421,7 +541,9 @@ export default function DashboardPage() {
               colorClass="bg-blue-100 text-blue-700"
               active={statusFilter === "submitted"}
               onClick={() =>
-                setStatusFilter((cur) => (cur === "submitted" ? "all" : "submitted"))
+                setStatusFilter((cur) =>
+                  cur === "submitted" ? "all" : "submitted",
+                )
               }
             />
             <MetricKpiCard
@@ -432,7 +554,9 @@ export default function DashboardPage() {
               colorClass="bg-[#3C8C7A]/15 text-[#3C8C7A]"
               active={statusFilter === "approved"}
               onClick={() =>
-                setStatusFilter((cur) => (cur === "approved" ? "all" : "approved"))
+                setStatusFilter((cur) =>
+                  cur === "approved" ? "all" : "approved",
+                )
               }
             />
             <MetricKpiCard
@@ -507,7 +631,10 @@ export default function DashboardPage() {
                   </Select>
 
                   {/* Project filter */}
-                  <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <Select
+                    value={projectFilter}
+                    onValueChange={setProjectFilter}
+                  >
                     <SelectTrigger className="h-8 w-44 text-xs bg-[#F8FAFC]">
                       <SelectValue placeholder="All projects" />
                     </SelectTrigger>
@@ -522,7 +649,10 @@ export default function DashboardPage() {
                   </Select>
 
                   {/* Category filter */}
-                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <Select
+                    value={categoryFilter}
+                    onValueChange={setCategoryFilter}
+                  >
                     <SelectTrigger className="h-8 w-44 text-xs bg-[#F8FAFC]">
                       <SelectValue placeholder="All categories" />
                     </SelectTrigger>
@@ -613,13 +743,16 @@ export default function DashboardPage() {
                       Team Roster & Submission Status · {rangeLabel}
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      Showing {filteredRoster.length} of {team.summary.total} team members
+                      Showing {filteredRoster.length} of {team.summary.total}{" "}
+                      team members
                     </p>
                   </div>
                   {metrics.submitted > 0 && canReview && (
                     <div className="flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
                       <AlertCircle className="size-3.5" />
-                      {metrics.submitted} report{metrics.submitted === 1 ? "" : "s"} waiting for your review
+                      {metrics.submitted} report
+                      {metrics.submitted === 1 ? "" : "s"} waiting for your
+                      review
                     </div>
                   )}
                 </div>
@@ -628,10 +761,16 @@ export default function DashboardPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-xs">Team Member</TableHead>
-                      <TableHead className="text-xs">Associated Project(s)</TableHead>
-                      <TableHead className="text-xs">Submission Status</TableHead>
+                      <TableHead className="text-xs">
+                        Associated Project(s)
+                      </TableHead>
+                      <TableHead className="text-xs">
+                        Submission Status
+                      </TableHead>
                       <TableHead className="text-xs">Reports</TableHead>
-                      <TableHead className="text-right text-xs">Review & Actions</TableHead>
+                      <TableHead className="text-right text-xs">
+                        Review & Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -660,7 +799,7 @@ export default function DashboardPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredRoster.map((member) => {
+                      paginatedRoster.map((member) => {
                         const status = deriveStatus(
                           member,
                           projectFilter === "all" ? undefined : projectFilter,
@@ -679,7 +818,10 @@ export default function DashboardPage() {
                         const needsReview = status === "submitted" && latest;
 
                         return (
-                          <TableRow key={member.id} className="hover:bg-[#F8FAFC]/80">
+                          <TableRow
+                            key={member.id}
+                            className="hover:bg-[#F8FAFC]/80"
+                          >
                             {/* Member cell */}
                             <TableCell>
                               <div className="flex items-center gap-3">
@@ -722,7 +864,9 @@ export default function DashboardPage() {
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
+                                <span className="text-xs text-muted-foreground">
+                                  —
+                                </span>
                               )}
                             </TableCell>
 
@@ -789,7 +933,9 @@ export default function DashboardPage() {
                                     asChild
                                     title="Open report page"
                                   >
-                                    <Link href={`/reports/${encodeId(latest.id)}`}>
+                                    <Link
+                                      href={`/reports/${encodeId(latest.id)}`}
+                                    >
                                       <ExternalLink className="size-3.5" />
                                     </Link>
                                   </Button>
@@ -802,6 +948,13 @@ export default function DashboardPage() {
                     )}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  page={rosterPage}
+                  pageCount={rosterPages > 0 ? rosterPages : 1}
+                  total={filteredRoster.length}
+                  pageSize={ROSTER_PAGE_SIZE}
+                  onChange={setRosterPage}
+                />
               </div>
             )}
 
@@ -814,7 +967,8 @@ export default function DashboardPage() {
                       Detailed Team Reports · {rangeLabel}
                     </h2>
                     <p className="text-xs text-muted-foreground">
-                      {allReportsList.length} report{allReportsList.length === 1 ? "" : "s"} found
+                      {allReportsList.length} report
+                      {allReportsList.length === 1 ? "" : "s"} found
                     </p>
                   </div>
                 </div>
@@ -827,7 +981,9 @@ export default function DashboardPage() {
                       <TableHead className="text-xs">Reporting Week</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
                       <TableHead className="text-xs">Version</TableHead>
-                      <TableHead className="text-right text-xs">Actions</TableHead>
+                      <TableHead className="text-right text-xs">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -840,13 +996,14 @@ export default function DashboardPage() {
                               No reports in this period
                             </p>
                             <p className="mt-0.5 text-xs text-muted-foreground">
-                              Change date range or filter settings to view submissions.
+                              Change date range or filter settings to view
+                              submissions.
                             </p>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      allReportsList.map((r) => (
+                      paginatedReports.map((r) => (
                         <TableRow key={r.id} className="hover:bg-[#F8FAFC]/80">
                           <TableCell>
                             <div className="flex items-center gap-2.5">
@@ -863,7 +1020,8 @@ export default function DashboardPage() {
                                   {r.userName}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
-                                  Updated {formatDate(r.updatedAt || r.createdAt)}
+                                  Updated{" "}
+                                  {formatDate(r.updatedAt || r.createdAt)}
                                 </p>
                               </div>
                             </div>
@@ -876,12 +1034,15 @@ export default function DashboardPage() {
                                 {r.projectName}
                               </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <span className="text-xs text-muted-foreground">
+                                —
+                              </span>
                             )}
                           </TableCell>
 
                           <TableCell className="text-xs text-[#38404F]">
-                            {formatDate(r.weekStartDate)} – {formatDate(r.weekEndDate)}
+                            {formatDate(r.weekStartDate)} –{" "}
+                            {formatDate(r.weekEndDate)}
                           </TableCell>
 
                           <TableCell>
@@ -932,6 +1093,13 @@ export default function DashboardPage() {
                     )}
                   </TableBody>
                 </Table>
+                <TablePagination
+                  page={reportsPage}
+                  pageCount={reportsPages > 0 ? reportsPages : 1}
+                  total={allReportsList.length}
+                  pageSize={REPORTS_PAGE_SIZE}
+                  onChange={setReportsPage}
+                />
               </div>
             )}
 
@@ -948,7 +1116,9 @@ export default function DashboardPage() {
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Compare blockers, achievements, completed tasks, or hours logged across the whole team simultaneously without opening each report.
+                    Compare blockers, achievements, completed tasks, or hours
+                    logged across the whole team simultaneously without opening
+                    each report.
                   </p>
                 </div>
 
@@ -957,9 +1127,13 @@ export default function DashboardPage() {
                     key={`${startDate}-${endDate}-${memberFilter}-${projectFilter}-${categoryFilter}`}
                     from={startDate}
                     to={endDate}
-                    projectId={projectFilter === "all" ? undefined : projectFilter}
+                    projectId={
+                      projectFilter === "all" ? undefined : projectFilter
+                    }
                     memberId={memberFilter === "all" ? undefined : memberFilter}
-                    category={categoryFilter === "all" ? undefined : categoryFilter}
+                    category={
+                      categoryFilter === "all" ? undefined : categoryFilter
+                    }
                     onOpenReport={handleOpenReport}
                   />
                 </div>
